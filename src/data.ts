@@ -1,80 +1,109 @@
 export type Category = {
   id: string
   title: string
-  count: string
+  hint: string
   image: string
 }
 
 export type Machine = {
   id: string
   name: string
+  brand: string
   category: string
   year: number
-  hours: string
+  condition: string
   price: string
   image: string
 }
 
+export const brands = ['HOWO', 'Hengte', 'SOVOL', 'Shantui', 'SHANMON'] as const
+
 export const categories: Category[] = [
+  {
+    id: 'trucks',
+    title: 'Самосвалы',
+    hint: 'HOWO и аналоги',
+    image: '/images/dump.jpg',
+  },
   {
     id: 'excavators',
     title: 'Экскаваторы',
-    count: '48 единиц',
-    image:
-      'https://images.unsplash.com/photo-1581094271901-8022df4466f9?auto=format&fit=crop&w=900&q=80',
+    hint: 'SOVOL, Shantui',
+    image: '/images/excavator.jpg',
+  },
+  {
+    id: 'bulldozers',
+    title: 'Бульдозеры',
+    hint: 'Shantui, SHANMON',
+    image: '/images/dozer.jpg',
   },
   {
     id: 'loaders',
     title: 'Погрузчики',
-    count: '36 единиц',
-    image:
-      'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=900&q=80',
-  },
-  {
-    id: 'cranes',
-    title: 'Краны',
-    count: '22 единицы',
-    image:
-      'https://images.unsplash.com/photo-1590496793929-36417d3117de?auto=format&fit=crop&w=900&q=80',
-  },
-  {
-    id: 'trucks',
-    title: 'Самосвалы',
-    count: '31 единица',
-    image:
-      'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=900&q=80',
+    hint: 'Hengte и другие',
+    image: '/images/loader.jpg',
   },
 ]
 
 export const machines: Machine[] = [
   {
     id: '1',
-    name: 'Caterpillar 320 GC',
-    category: 'Экскаватор',
-    year: 2021,
-    hours: '3 420 м/ч',
-    price: '18 900 000 ₸',
-    image:
-      'https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&w=1000&q=80',
+    name: 'HOWO 371',
+    brand: 'HOWO',
+    category: 'Грузовик',
+    year: 2025,
+    condition: 'Новый',
+    price: 'от 24 700 000 ₸',
+    image: '/images/howo.jpg',
   },
   {
     id: '2',
-    name: 'Komatsu WA380-8',
-    category: 'Погрузчик',
-    year: 2020,
-    hours: '4 180 м/ч',
-    price: '24 500 000 ₸',
-    image:
-      'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=1000&q=80',
+    name: 'HOWO Tipper 6×4',
+    brand: 'HOWO',
+    category: 'Самосвал',
+    year: 2025,
+    condition: 'Новый',
+    price: 'от 28 500 000 ₸',
+    image: '/images/dump.jpg',
   },
   {
     id: '3',
-    name: 'Liebherr LTM 1050',
-    category: 'Автокран',
-    year: 2019,
-    hours: '2 960 м/ч',
-    price: '41 200 000 ₸',
-    image:
-      'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1000&q=80',
+    name: 'SOVOL SWE215',
+    brand: 'SOVOL',
+    category: 'Экскаватор',
+    year: 2025,
+    condition: 'Новый',
+    price: 'от 32 900 000 ₸',
+    image: '/images/excavator.jpg',
+  },
+  {
+    id: '4',
+    name: 'Shantui SD32',
+    brand: 'Shantui',
+    category: 'Бульдозер',
+    year: 2025,
+    condition: 'Новый',
+    price: 'от 41 200 000 ₸',
+    image: '/images/dozer.jpg',
+  },
+  {
+    id: '5',
+    name: 'Hengte HT956',
+    brand: 'Hengte',
+    category: 'Погрузчик',
+    year: 2025,
+    condition: 'Новый',
+    price: 'от 19 800 000 ₸',
+    image: '/images/loader.jpg',
+  },
+  {
+    id: '6',
+    name: 'SHANMON SM220',
+    brand: 'SHANMON',
+    category: 'Экскаватор',
+    year: 2025,
+    condition: 'Новый',
+    price: 'от 29 400 000 ₸',
+    image: '/images/excavator-2.jpg',
   },
 ]
