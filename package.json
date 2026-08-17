@@ -4,17 +4,32 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"node scripts/php-server.mjs\" \"vite\"",
+    "server": "node scripts/php-server.mjs",
+    "server:node": "node server/index.js",
+    "build": "tsc -b && vite build && node scripts/copy-php.mjs",
+    "start": "node scripts/php-server.mjs dist",
     "preview": "vite preview"
   },
   "dependencies": {
+    "concurrently": "^10.0.5",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "nodemailer": "^9.0.5",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.18.2",
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "@types/uuid": "^11.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"

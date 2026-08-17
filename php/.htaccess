@@ -1,0 +1,12 @@
+DirectoryIndex index.php
+
+<IfModule mod_authz_core.c>
+  <FilesMatch "^(config\.php|config\.example\.php|bootstrap\.php|store\.php|auth\.php|mail\.php|seed\.json)$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+<IfModule !mod_authz_core.c>
+  <FilesMatch "^(config\.php|config\.example\.php|bootstrap\.php|store\.php|auth\.php|mail\.php|seed\.json)$">
+    Deny from all
+  </FilesMatch>
+</IfModule>
