@@ -17,6 +17,13 @@ export function clearAdminToken() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+export const AUTH_LOST_EVENT = 'buytech:unauthorized'
+
+function notifyAuthLost() {
+  clearAdminToken()
+  window.dispatchEvent(new Event(AUTH_LOST_EVENT))
+}
+
 async function request<T>(path: string, options: RequestInit = {}, auth = false): Promise<T> {
   const headers = new Headers(options.headers || {})
   if (!(options.body instanceof FormData)) {
@@ -35,10 +42,14 @@ async function request<T>(path: string, options: RequestInit = {}, auth = false)
     data = (text ? JSON.parse(text) : {}) as { error?: string } & T
   } catch {
     throw new Error(
-      'API не отвечает (пришёл HTML вместо JSON). Проверьте, что на хостинге залита папка api/ из dist/.',
+      'API не отвечает (пришёл HTML вместо JSON). Локально перезапустите yarn dev. На хостинге проверьте папку api/ из dist/.',
     )
   }
   if (!response.ok) {
+    if (response.status === 401 && auth) {
+      notifyAuthLost()
+      throw new Error('Сессия истекла. Войдите в админку заново.')
+    }
     throw new Error(data.error || `HTTP ${response.status}`)
   }
   return data
@@ -57,6 +68,7 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }),
   logout: () => request('/admin/logout', { method: 'POST' }, true),
+  checkSession: () => request<{ ok: boolean }>('/admin/session', {}, true),
   getLeads: () => request<Lead[]>('/admin/leads', {}, true),
   updateLead: (id: string, status: string) =>
     request<Lead>(`/admin/leads/${id}`, {

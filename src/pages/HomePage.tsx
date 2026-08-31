@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Footer, Header } from '../components/Layout'
 import { MachineCard } from '../components/MachineCard'
 import { useSite } from '../context/SiteContext'
+import { rootCategories } from '../categoryTree'
 
 export function HomePage() {
   const { content, brands, categories, machines, loading } = useSite()
@@ -57,7 +58,7 @@ export function HomePage() {
             <p>{home.categoriesLead}</p>
           </div>
           <div className="category-grid">
-            {categories.map((category) => (
+            {rootCategories(categories).map((category) => (
               <Link
                 key={category.id}
                 className="category"

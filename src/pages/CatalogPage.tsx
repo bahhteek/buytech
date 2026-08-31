@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../types'
 import {
@@ -12,7 +12,8 @@ import {
 import { Footer, Header } from '../components/Layout'
 import { MachineCard } from '../components/MachineCard'
 import { useSite } from '../context/SiteContext'
-import type { Machine } from '../types'
+import type { Category, Machine } from '../types'
+import { childCategories } from '../categoryTree'
 import './CatalogPage.css'
 
 const STEP = 100_000
@@ -48,6 +49,78 @@ function sortMachines(list: Machine[], sort: SortKey) {
   return next
 }
 
+function FilterBlock({
+  title,
+  open,
+  onToggle,
+  hint,
+  children,
+}: {
+  title: string
+  open: boolean
+  onToggle: () => void
+  hint?: string
+  children: ReactNode
+}) {
+  return (
+    <div className={`filter-block${open ? ' is-open' : ''}`}>
+      <button
+        type="button"
+        className="filter-toggle"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <h2>{title}</h2>
+        {hint ? <em className="filter-toggle-hint">{hint}</em> : null}
+        <span className="filter-arrow" aria-hidden="true" />
+      </button>
+      {open ? <div className="filter-block-body">{children}</div> : null}
+    </div>
+  )
+}
+
+function CategoryFilterNode({
+  category,
+  categories,
+  selectedCategory,
+  counts,
+  onSelect,
+}: {
+  category: Category
+  categories: Category[]
+  selectedCategory: string
+  counts: Record<string, number>
+  onSelect: (id: string) => void
+}) {
+  const children = childCategories(categories, category.id)
+  return (
+    <li>
+      <button
+        type="button"
+        className={selectedCategory === category.id ? 'is-active' : undefined}
+        onClick={() => onSelect(category.id)}
+      >
+        <span>{category.title}</span>
+        <em>{counts[category.id] || 0}</em>
+      </button>
+      {children.length > 0 && (
+        <ul className="filter-categories-nested">
+          {children.map((child) => (
+            <CategoryFilterNode
+              key={child.id}
+              category={child}
+              categories={categories}
+              selectedCategory={selectedCategory}
+              counts={counts}
+              onSelect={onSelect}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  )
+}
+
 export function CatalogPage() {
   const { categories, machines, content, priceBounds } = useSite()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -57,6 +130,11 @@ export function CatalogPage() {
   const [sort, setSort] = useState<SortKey>('price-asc')
   const [selectedBrands, setSelectedBrands] = useState<string[]>([])
   const [selectedSpecs, setSelectedSpecs] = useState<Record<string, string[]>>({})
+  const [openBlocks, setOpenBlocks] = useState<Record<string, boolean>>({
+    category: true,
+    brand: true,
+    price: true,
+  })
 
   const bounds =
     priceBounds.min === priceBounds.max
@@ -73,8 +151,8 @@ export function CatalogPage() {
     : 'all'
 
   const categoryPool = useMemo(
-    () => machinesInCategory(machines, selectedCategory),
-    [machines, selectedCategory],
+    () => machinesInCategory(machines, selectedCategory, categories),
+    [machines, selectedCategory, categories],
   )
 
   const brandOptions = useMemo(() => brandsInPool(categoryPool), [categoryPool])
@@ -104,7 +182,7 @@ export function CatalogPage() {
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: machines.length }
     for (const category of categories) {
-      counts[category.id] = machines.filter((m) => m.categoryId === category.id).length
+      counts[category.id] = machinesInCategory(machines, category.id, categories).length
     }
     return counts
   }, [categories, machines])
@@ -175,8 +253,13 @@ export function CatalogPage() {
 
         <div className="catalog-layout">
           <aside className="catalog-sidebar">
-            <div className="filter-block">
-              <h2>Категории</h2>
+            <FilterBlock
+              title="Категории"
+              open={openBlocks.category !== false}
+              onToggle={() =>
+                setOpenBlocks((prev) => ({ ...prev, category: prev.category === false }))
+              }
+            >
               <ul className="filter-categories">
                 <li>
                   <button
@@ -188,26 +271,27 @@ export function CatalogPage() {
                     <em>{categoryCounts.all}</em>
                   </button>
                 </li>
-                {categories.map((category) => (
-                  <li key={category.id}>
-                    <button
-                      type="button"
-                      className={
-                        selectedCategory === category.id ? 'is-active' : undefined
-                      }
-                      onClick={() => selectCategory(category.id)}
-                    >
-                      <span>{category.title}</span>
-                      <em>{categoryCounts[category.id]}</em>
-                    </button>
-                  </li>
+                {childCategories(categories).map((category) => (
+                  <CategoryFilterNode
+                    key={category.id}
+                    category={category}
+                    categories={categories}
+                    selectedCategory={selectedCategory}
+                    counts={categoryCounts}
+                    onSelect={selectCategory}
+                  />
                 ))}
               </ul>
-            </div>
+            </FilterBlock>
 
             {brandOptions.length > 0 && (
-              <div className="filter-block">
-                <h2>Марка</h2>
+              <FilterBlock
+                title="Марка"
+                open={openBlocks.brand !== false}
+                onToggle={() =>
+                  setOpenBlocks((prev) => ({ ...prev, brand: prev.brand === false }))
+                }
+              >
                 <ul className="filter-checks">
                   {brandOptions.map((brand) => (
                     <li key={brand.id}>
@@ -223,31 +307,49 @@ export function CatalogPage() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </FilterBlock>
             )}
 
-            {specFacets.map((facet) => (
-              <div className="filter-block" key={facet.label}>
-                <h2>{facet.label}</h2>
-                <ul className="filter-checks">
-                  {facet.values.map((value) => (
-                    <li key={value}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={(selectedSpecs[facet.label] || []).includes(value)}
-                          onChange={() => toggleSpec(facet.label, value)}
-                        />
-                        <span>{value}</span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+            {specFacets.map((facet) => {
+              const selectedCount = (selectedSpecs[facet.label] || []).length
+              return (
+                <FilterBlock
+                  key={facet.label}
+                  title={facet.label}
+                  open={Boolean(openBlocks[`spec:${facet.label}`])}
+                  hint={selectedCount ? String(selectedCount) : undefined}
+                  onToggle={() =>
+                    setOpenBlocks((prev) => ({
+                      ...prev,
+                      [`spec:${facet.label}`]: !prev[`spec:${facet.label}`],
+                    }))
+                  }
+                >
+                  <ul className="filter-checks">
+                    {facet.values.map((value) => (
+                      <li key={value}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={(selectedSpecs[facet.label] || []).includes(value)}
+                            onChange={() => toggleSpec(facet.label, value)}
+                          />
+                          <span>{value}</span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </FilterBlock>
+              )
+            })}
 
-            <div className="filter-block">
-              <h2>Цена, ₸</h2>
+            <FilterBlock
+              title="Цена, ₸"
+              open={openBlocks.price !== false}
+              onToggle={() =>
+                setOpenBlocks((prev) => ({ ...prev, price: prev.price === false }))
+              }
+            >
               <div className="price-values">
                 <span>от {formatPrice(priceMin)}</span>
                 <span>до {formatPrice(priceMax)}</span>
@@ -278,7 +380,7 @@ export function CatalogPage() {
                   aria-label="Максимальная цена"
                 />
               </div>
-            </div>
+            </FilterBlock>
 
             <button className="btn btn-ghost filter-reset" type="button" onClick={resetFilters}>
               Сбросить фильтры

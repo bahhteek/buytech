@@ -12,23 +12,28 @@ function read_tokens()
         }
     }
     if (count($fresh) !== count($tokens)) {
-        write_json_file(BUYTECH_TOKENS, $fresh);
+        write_tokens($fresh);
     }
     return $fresh;
+}
+
+function write_tokens($tokens)
+{
+    write_json_file(BUYTECH_TOKENS, $tokens, true);
 }
 
 function save_token($token)
 {
     $tokens = read_tokens();
     $tokens[$token] = array('exp' => time() + 60 * 60 * 24 * 7);
-    write_json_file(BUYTECH_TOKENS, $tokens);
+    write_tokens($tokens);
 }
 
 function delete_token($token)
 {
     $tokens = read_tokens();
     unset($tokens[$token]);
-    write_json_file(BUYTECH_TOKENS, $tokens);
+    write_tokens($tokens);
 }
 
 function require_auth()

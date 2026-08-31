@@ -1,13 +1,15 @@
 import { Link, useParams } from 'react-router-dom'
+import { Fragment } from 'react'
 import { Footer, Header } from '../components/Layout'
 import { MachineCard } from '../components/MachineCard'
 import { ImageSlider, VideoEmbed } from '../components/Media'
 import { useSite } from '../context/SiteContext'
+import { categoryPath } from '../categoryTree'
 import './ProductPage.css'
 
 export function ProductPage() {
   const { id } = useParams()
-  const { getMachineById, getRelatedMachines, loading } = useSite()
+  const { getMachineById, getRelatedMachines, categories, loading } = useSite()
   const machine = id ? getMachineById(id) : undefined
 
   if (loading) {
@@ -42,6 +44,7 @@ export function ProductPage() {
 
   const related = getRelatedMachines(machine)
   const requestLink = `/contacts?need=${encodeURIComponent(machine.name)}`
+  const crumbs = categoryPath(categories, machine.categoryId)
 
   return (
     <div className="page product-page">
@@ -52,8 +55,18 @@ export function ProductPage() {
           <Link to="/">Главная</Link>
           <span>/</span>
           <Link to="/catalog">Каталог</Link>
-          <span>/</span>
-          <Link to={`/catalog?category=${machine.categoryId}`}>{machine.category}</Link>
+          {crumbs.map((item) => (
+            <Fragment key={item.id}>
+              <span>/</span>
+              <Link to={`/catalog?category=${item.id}`}>{item.title}</Link>
+            </Fragment>
+          ))}
+          {crumbs.length === 0 && (
+            <>
+              <span>/</span>
+              <Link to={`/catalog?category=${machine.categoryId}`}>{machine.category}</Link>
+            </>
+          )}
           <span>/</span>
           <span>{machine.name}</span>
         </nav>

@@ -227,6 +227,10 @@
   cursor: pointer;
 }
 
+.admin-cat-card {
+  border-left-width: 6px;
+}
+
 .admin-badge {
   padding: 0.15rem 0.45rem;
   background: #ffd400;
@@ -292,6 +296,7 @@
 .admin-content-stack {
   display: grid;
   gap: 1.25rem;
+  scroll-margin-top: 1rem;
 }
 
 .admin-content-block {
@@ -355,23 +360,41 @@
 .admin-related-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0.45rem 0 0;
   display: grid;
-  gap: 0.5rem;
+  gap: 0.35rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #ffd400 #111;
+}
+
+.admin-related-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.admin-related-list::-webkit-scrollbar-track {
+  background: #111;
+}
+
+.admin-related-list::-webkit-scrollbar-thumb {
+  background: #ffd400;
+  border: 2px solid #111;
 }
 
 .admin-related-list label {
   display: grid;
-  grid-template-columns: auto 56px 1fr;
-  gap: 0.7rem;
+  grid-template-columns: auto 48px 1fr;
+  gap: 0.55rem;
   align-items: center;
-  padding: 0.55rem 0.65rem;
+  padding: 0.4rem 0.55rem;
   border: 1px solid #ddd;
   background: #faf8f4;
   cursor: pointer;
   text-transform: none;
   letter-spacing: 0;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
@@ -382,8 +405,8 @@
 }
 
 .admin-related-list img {
-  width: 56px;
-  height: 42px;
+  width: 48px;
+  height: 36px;
   object-fit: cover;
   border: 1px solid #111;
 }

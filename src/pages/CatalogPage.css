@@ -56,17 +56,87 @@
   display: grid;
   gap: 1rem;
   align-content: start;
-  padding: 1.1rem;
+  padding: 1.2rem 1.25rem;
   background: var(--white);
+  border: 2px solid var(--black);
+  scrollbar-width: thin;
+  scrollbar-color: var(--yellow) var(--black);
+}
+
+.catalog-sidebar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.catalog-sidebar::-webkit-scrollbar-track {
+  background: var(--black);
+}
+
+.catalog-sidebar::-webkit-scrollbar-thumb {
+  background: var(--yellow);
   border: 2px solid var(--black);
 }
 
+.catalog-sidebar::-webkit-scrollbar-thumb:hover {
+  background: var(--yellow-deep);
+}
+
 .filter-block h2 {
-  margin: 0 0 0.85rem;
+  margin: 0;
   font-family: var(--font-display);
   font-size: 1rem;
   letter-spacing: -0.02em;
   text-transform: uppercase;
+}
+
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0 0 0.35rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.filter-block.is-open .filter-toggle {
+  margin-bottom: 0.85rem;
+}
+
+.filter-toggle h2 {
+  flex: 1;
+}
+
+.filter-toggle-hint {
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 800;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--yellow);
+  border: 2px solid var(--black);
+}
+
+.filter-arrow {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid var(--black);
+  border-bottom: 2px solid var(--black);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.filter-block.is-open .filter-arrow {
+  transform: rotate(-135deg);
+  margin-top: 0.25rem;
 }
 
 .filter-categories {
@@ -102,6 +172,15 @@
 .filter-categories button.is-active {
   background: var(--yellow);
   border-color: var(--black);
+}
+
+.filter-categories-nested {
+  list-style: none;
+  margin: 0.3rem 0 0.45rem;
+  padding: 0 0 0 0.75rem;
+  display: grid;
+  gap: 0.3rem;
+  border-left: 2px solid var(--black);
 }
 
 .filter-categories em {
@@ -358,14 +437,18 @@
 
 @media (min-width: 900px) {
   .catalog-layout {
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 1.5rem;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 1.75rem;
     align-items: start;
   }
 
   .catalog-sidebar {
     position: sticky;
     top: 5.25rem;
+    max-height: calc(100dvh - 5.75rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.7rem;
   }
 }
 

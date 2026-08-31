@@ -88,6 +88,11 @@ function route($method, $path)
         json_response(array('ok' => true));
     }
 
+    if ($method === 'GET' && $path === '/admin/session') {
+        require_auth();
+        json_response(array('ok' => true));
+    }
+
     if ($method === 'GET' && $path === '/admin/leads') {
         require_auth();
         json_response(read_db()['leads']);
@@ -220,6 +225,7 @@ function route($method, $path)
             'title' => $title,
             'hint' => isset($body['hint']) ? trim((string) $body['hint']) : '',
             'image' => isset($body['image']) && $body['image'] !== '' ? (string) $body['image'] : '/images/excavator.jpg',
+            'parentId' => sanitize_parent_id(isset($body['parentId']) ? $body['parentId'] : '', read_db()['categories']),
         );
         update_db(function ($db) use ($category) {
             $db['categories'][] = $category;
@@ -240,6 +246,13 @@ function route($method, $path)
                         if (isset($body['title'])) $db['categories'][$index]['title'] = (string) $body['title'];
                         if (isset($body['hint'])) $db['categories'][$index]['hint'] = (string) $body['hint'];
                         if (isset($body['image'])) $db['categories'][$index]['image'] = (string) $body['image'];
+                        if (array_key_exists('parentId', $body)) {
+                            $db['categories'][$index]['parentId'] = sanitize_parent_id(
+                                $body['parentId'],
+                                $db['categories'],
+                                $id,
+                            );
+                        }
                         $updated = $db['categories'][$index];
                         break;
                     }
@@ -253,9 +266,10 @@ function route($method, $path)
         }
         if ($method === 'DELETE') {
             update_db(function ($db) use ($id) {
+                $remove = category_descendant_ids($db['categories'], $id);
                 $next = array();
                 foreach ($db['categories'] as $category) {
-                    if ((string) $category['id'] !== (string) $id) {
+                    if (!in_array((string) $category['id'], $remove, true)) {
                         $next[] = $category;
                     }
                 }

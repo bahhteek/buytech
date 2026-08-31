@@ -1,4 +1,5 @@
-import type { Machine } from './types'
+import type { Category, Machine } from './types'
+import { descendantIds } from './categoryTree'
 
 export type SpecFacet = {
   label: string
@@ -12,9 +13,17 @@ function normalizeLabel(label: string) {
   return label.trim().toLowerCase()
 }
 
-export function machinesInCategory(machines: Machine[], categoryId: string) {
+export function machinesInCategory(
+  machines: Machine[],
+  categoryId: string,
+  categories: Category[] = [],
+) {
   if (categoryId === 'all') return machines
-  return machines.filter((machine) => machine.categoryId === categoryId)
+  if (!categories.length) {
+    return machines.filter((machine) => machine.categoryId === categoryId)
+  }
+  const ids = new Set(descendantIds(categories, categoryId))
+  return machines.filter((machine) => ids.has(machine.categoryId))
 }
 
 export function brandsInPool(machines: Machine[]) {

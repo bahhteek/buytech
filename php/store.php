@@ -20,7 +20,7 @@ function read_json_file($path, $default = array())
     return is_array($data) ? $data : $default;
 }
 
-function write_json_file($path, $data)
+function write_json_file($path, $data, $forceObject = false)
 {
     $dir = dirname($path);
     if (!is_dir($dir)) {
@@ -30,10 +30,14 @@ function write_json_file($path, $data)
     if (!$fp) {
         throw new RuntimeException('Cannot write ' . $path);
     }
+    $flags = JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT;
+    if ($forceObject) {
+        $flags |= JSON_FORCE_OBJECT;
+    }
     flock($fp, LOCK_EX);
     ftruncate($fp, 0);
     rewind($fp);
-    fwrite($fp, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    fwrite($fp, json_encode($data, $flags));
     fflush($fp);
     flock($fp, LOCK_UN);
     fclose($fp);
@@ -158,4 +162,45 @@ function normalize_related_ids($ids, $exclude = '')
         }
     }
     return $out;
+}
+
+function category_parent_id($category)
+{
+    return isset($category['parentId']) ? trim((string) $category['parentId']) : '';
+}
+
+function category_descendant_ids($categories, $id)
+{
+    $ids = array((string) $id);
+    $added = true;
+    while ($added) {
+        $added = false;
+        foreach ($categories as $category) {
+            $parent = category_parent_id($category);
+            $cid = (string) $category['id'];
+            if ($parent !== '' && in_array($parent, $ids, true) && !in_array($cid, $ids, true)) {
+                $ids[] = $cid;
+                $added = true;
+            }
+        }
+    }
+    return $ids;
+}
+
+function sanitize_parent_id($parentId, $categories, $selfId = '')
+{
+    $parentId = trim((string) $parentId);
+    if ($parentId === '') {
+        return '';
+    }
+    if ($selfId !== '' && $parentId === (string) $selfId) {
+        return '';
+    }
+    if (!find_by_id($categories, $parentId)) {
+        return '';
+    }
+    if ($selfId !== '' && in_array($parentId, category_descendant_ids($categories, $selfId), true)) {
+        return '';
+    }
+    return $parentId;
 }

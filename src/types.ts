@@ -14,6 +14,8 @@ export type Category = {
   title: string
   hint: string
   image: string
+  /** Empty / omitted = root category. Nested as deep as needed. */
+  parentId?: string
 }
 
 export type Machine = {

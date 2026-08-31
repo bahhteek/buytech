@@ -241,6 +241,7 @@ app.post('/api/admin/categories', auth, (req, res) => {
     title,
     hint,
     image,
+    parentId: String(req.body?.parentId || '').trim(),
   }
   updateDb((db) => {
     db.categories.push(category)
@@ -257,6 +258,7 @@ app.put('/api/admin/categories/:id', auth, (req, res) => {
     if (req.body.title != null) category.title = String(req.body.title)
     if (req.body.hint != null) category.hint = String(req.body.hint)
     if (req.body.image != null) category.image = String(req.body.image)
+    if (req.body.parentId != null) category.parentId = String(req.body.parentId || '').trim()
     updated = category
     return db
   })
@@ -266,7 +268,15 @@ app.put('/api/admin/categories/:id', auth, (req, res) => {
 
 app.delete('/api/admin/categories/:id', auth, (req, res) => {
   updateDb((db) => {
-    db.categories = db.categories.filter((item) => item.id !== req.params.id)
+    const remove = new Set()
+    const visit = (id) => {
+      remove.add(id)
+      for (const item of db.categories) {
+        if (String(item.parentId || '') === id) visit(item.id)
+      }
+    }
+    visit(req.params.id)
+    db.categories = db.categories.filter((item) => !remove.has(item.id))
     return db
   })
   res.json({ ok: true })

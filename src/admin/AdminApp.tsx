@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { api, clearAdminToken, getAdminToken, setAdminToken } from '../api/client'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { api, AUTH_LOST_EVENT, clearAdminToken, getAdminToken, setAdminToken } from '../api/client'
 import type { AboutContent, Brand, Category, Lead, Machine, SiteContent, Spec } from '../types'
 import { normalizeAbout } from '../types'
 import { useSite } from '../context/SiteContext'
+import { machinesInCategory } from '../catalogFilters'
+import {
+  categoryOptionLabel,
+  descendantIds,
+  flattenCategoryTree,
+} from '../categoryTree'
 import './admin.css'
 
 function requireAuth() {
@@ -12,9 +18,15 @@ function requireAuth() {
 
 function AdminLogin() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const expired =
+    location.state &&
+    typeof location.state === 'object' &&
+    'reason' in location.state &&
+    (location.state as { reason?: string }).reason === 'expired'
+  const [error, setError] = useState(expired ? 'Сессия истекла. Войдите снова.' : '')
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -106,7 +118,47 @@ function AdminShell({ children }: { children: ReactNode }) {
 }
 
 function Guard({ children }: { children: ReactNode }) {
-  if (!requireAuth()) return <Navigate to="/admin/login" replace />
+  const [ok, setOk] = useState<boolean | null>(() => (requireAuth() ? null : false))
+  const [expired, setExpired] = useState(false)
+
+  useEffect(() => {
+    if (ok !== null) return
+    let cancelled = false
+    void api
+      .checkSession()
+      .then(() => {
+        if (!cancelled) setOk(true)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setExpired(true)
+          setOk(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [ok])
+
+  useEffect(() => {
+    const onLost = () => {
+      setExpired(true)
+      setOk(false)
+    }
+    window.addEventListener(AUTH_LOST_EVENT, onLost)
+    return () => window.removeEventListener(AUTH_LOST_EVENT, onLost)
+  }, [])
+
+  if (ok === false) {
+    return <Navigate to="/admin/login" replace state={expired ? { reason: 'expired' } : undefined} />
+  }
+  if (ok !== true) {
+    return (
+      <div className="admin-login">
+        <p>Проверка сессии…</p>
+      </div>
+    )
+  }
   return <AdminShell>{children}</AdminShell>
 }
 
@@ -708,9 +760,12 @@ function CategoriesAdmin() {
   const [title, setTitle] = useState('')
   const [hint, setHint] = useState('')
   const [image, setImage] = useState('/images/excavator.jpg')
+  const [parentId, setParentId] = useState('')
+  const tree = flattenCategoryTree(categories)
 
   async function create() {
-    await api.createCategory({ title, hint, image })
+    if (!title.trim()) return
+    await api.createCategory({ title: title.trim(), hint, image, parentId })
     setTitle('')
     setHint('')
     await refresh()
@@ -722,23 +777,44 @@ function CategoriesAdmin() {
     await refresh()
   }
 
+  async function remove(category: Category) {
+    const kids = flattenCategoryTree(categories, category.id)
+    const extra = kids.length ? ` Вместе с ней удалятся ${kids.length} подкатегорий.` : ''
+    if (!confirm(`Удалить «${category.title}»?${extra}`)) return
+    await api.deleteCategory(category.id)
+    if (parentId === category.id) setParentId('')
+    await refresh()
+  }
+
   return (
     <div className="admin-section">
       <h1>Категории</h1>
       <div className="admin-card">
-        <h2>Добавить</h2>
+        <h2>{parentId ? 'Добавить подкатегорию' : 'Добавить категорию'}</h2>
         <div className="admin-inline">
           <input placeholder="Название" value={title} onChange={(e) => setTitle(e.target.value)} />
           <input placeholder="Подпись" value={hint} onChange={(e) => setHint(e.target.value)} />
           <input placeholder="URL фото" value={image} onChange={(e) => setImage(e.target.value)} />
+          <select value={parentId} onChange={(e) => setParentId(e.target.value)} aria-label="Родитель">
+            <option value="">Корневая категория</option>
+            {tree.map(({ category, depth }) => (
+              <option key={category.id} value={category.id}>
+                {categoryOptionLabel(category.title, depth)}
+              </option>
+            ))}
+          </select>
           <button className="btn btn-primary" type="button" onClick={() => void create()}>
             Добавить
           </button>
         </div>
       </div>
       <div className="admin-list">
-        {categories.map((category) => (
-          <div className="admin-card" key={category.id}>
+        {tree.map(({ category, depth }) => (
+          <div
+            className="admin-card admin-cat-card"
+            key={category.id}
+            style={{ marginLeft: `${depth * 1.5}rem` }}
+          >
             <img src={category.image} alt="" className="admin-thumb" />
             <input
               value={category.title}
@@ -753,6 +829,22 @@ function CategoriesAdmin() {
                 void api.updateCategory(category.id, { hint: e.target.value }).then(refresh)
               }}
             />
+            <select
+              value={category.parentId || ''}
+              onChange={(e) =>
+                void api.updateCategory(category.id, { parentId: e.target.value }).then(refresh)
+              }
+              aria-label="Родитель"
+            >
+              <option value="">Корневая</option>
+              {tree
+                .filter(({ category: item }) => !descendantIds(categories, category.id).includes(item.id))
+                .map(({ category: item, depth: itemDepth }) => (
+                  <option key={item.id} value={item.id}>
+                    {categoryOptionLabel(item.title, itemDepth)}
+                  </option>
+                ))}
+            </select>
             <label className="admin-file">
               Фото
               <input
@@ -765,9 +857,21 @@ function CategoriesAdmin() {
               />
             </label>
             <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() => {
+                setParentId(category.id)
+                setTitle('')
+                setHint('')
+                setImage(category.image || '/images/excavator.jpg')
+              }}
+            >
+              Подкатегория
+            </button>
+            <button
               type="button"
               className="btn btn-dark"
-              onClick={() => void api.deleteCategory(category.id).then(refresh)}
+              onClick={() => void remove(category)}
             >
               Удалить
             </button>
@@ -843,6 +947,10 @@ function MachinesAdmin() {
   const { machines, brands, categories, refresh } = useSite()
   const [draft, setDraft] = useState<Partial<Machine>>(emptyMachine(brands, categories))
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [categoryTab, setCategoryTab] = useState('all')
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const editRef = useRef<HTMLDivElement>(null)
 
   function startEdit(machine: Machine) {
     setEditingId(machine.id)
@@ -854,21 +962,38 @@ function MachinesAdmin() {
     })
   }
 
+  useEffect(() => {
+    if (!editingId) return
+    editRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [editingId])
+
   function resetForm() {
     setEditingId(null)
     setDraft(emptyMachine(brands, categories))
   }
 
   async function save() {
-    if (editingId) await api.updateMachine(editingId, draft)
-    else await api.createMachine(draft)
-    resetForm()
-    await refresh()
+    setError('')
+    setMessage('')
+    try {
+      if (editingId) await api.updateMachine(editingId, draft)
+      else await api.createMachine(draft)
+      resetForm()
+      await refresh()
+      setMessage('Сохранено')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось сохранить')
+    }
   }
 
   async function uploadImage(file: File) {
-    const { url } = await api.upload(file)
-    setDraft((prev) => ({ ...prev, images: [...(prev.images || []), url] }))
+    setError('')
+    try {
+      const { url } = await api.upload(file)
+      setDraft((prev) => ({ ...prev, images: [...(prev.images || []), url] }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить фото')
+    }
   }
 
   function toggleRelated(id: string) {
@@ -884,6 +1009,8 @@ function MachinesAdmin() {
   }
 
   const relatedCandidates = machines.filter((machine) => machine.id !== editingId)
+  const categoryTabs = flattenCategoryTree(categories)
+  const listMachines = machinesInCategory(machines, categoryTab, categories)
   const categorySpecHints = useMemo(() => {
     const labels = new Set<string>()
     for (const machine of machines) {
@@ -906,7 +1033,7 @@ function MachinesAdmin() {
         )}
       </div>
 
-      <div className="admin-content-stack">
+      <div className="admin-content-stack" ref={editRef}>
         <ContentBlock
           title={editingId ? 'Редактирование' : 'Новая позиция'}
           description="Основные данные карточки техники."
@@ -944,9 +1071,9 @@ function MachinesAdmin() {
                 }))
               }}
             >
-              {categories.map((category) => (
+              {flattenCategoryTree(categories).map(({ category, depth }) => (
                 <option key={category.id} value={category.id}>
-                  {category.title}
+                  {categoryOptionLabel(category.title, depth)}
                 </option>
               ))}
             </select>
@@ -1155,12 +1282,41 @@ function MachinesAdmin() {
               Отмена
             </button>
           )}
+          {error ? <p className="admin-error">{error}</p> : null}
+          {message ? <p className="admin-ok">{message}</p> : null}
         </div>
       </div>
 
       <div className="admin-list">
         <h2>Все позиции</h2>
-        {machines.map((machine) => (
+        {categoryTabs.length > 0 && (
+          <div className="admin-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={categoryTab === 'all'}
+              className={categoryTab === 'all' ? 'is-active' : undefined}
+              onClick={() => setCategoryTab('all')}
+            >
+              Все
+              <em>{machines.length}</em>
+            </button>
+            {categoryTabs.map(({ category, depth }) => (
+              <button
+                key={category.id}
+                type="button"
+                role="tab"
+                aria-selected={categoryTab === category.id}
+                className={categoryTab === category.id ? 'is-active' : undefined}
+                onClick={() => setCategoryTab(category.id)}
+              >
+                {depth ? `— ${category.title}` : category.title}
+                <em>{machinesInCategory(machines, category.id, categories).length}</em>
+              </button>
+            ))}
+          </div>
+        )}
+        {listMachines.map((machine) => (
           <div className="admin-card admin-row" key={machine.id}>
             <img src={machine.images?.[0]} alt="" className="admin-thumb" />
             <div>
