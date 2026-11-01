@@ -1,4 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
+import { DEFAULT_CONTACTS, telHref, waHref } from '../contactLinks'
 import { useSite } from '../context/SiteContext'
 
 type HeaderProps = {
@@ -50,8 +51,17 @@ export function Footer() {
 
         <div className="footer-col">
           <h3>Связь</h3>
-          <a href={`tel:${(content.contacts?.phone || '+77001234567').replace(/\D/g, '')}`}>
-            {content.contacts?.phone || '+7 (700) 123-45-67'}
+          <a href={telHref(content.contacts?.phone || DEFAULT_CONTACTS.phone)}>
+            {content.contacts?.phone || DEFAULT_CONTACTS.phone}
+          </a>
+          <a href={telHref(content.contacts?.phone2 || DEFAULT_CONTACTS.phone2)}>
+            {content.contacts?.phone2 || DEFAULT_CONTACTS.phone2}
+          </a>
+          <a href={waHref(content.contacts?.whatsapp || DEFAULT_CONTACTS.whatsapp)} target="_blank" rel="noreferrer">
+            WhatsApp {content.contacts?.whatsapp || DEFAULT_CONTACTS.whatsapp}
+          </a>
+          <a href={waHref(content.contacts?.whatsapp2 || DEFAULT_CONTACTS.whatsapp2)} target="_blank" rel="noreferrer">
+            WhatsApp {content.contacts?.whatsapp2 || DEFAULT_CONTACTS.whatsapp2}
           </a>
           <a href={`mailto:${content.contacts?.email || 'hello@buytech.kz'}`}>
             {content.contacts?.email || 'hello@buytech.kz'}

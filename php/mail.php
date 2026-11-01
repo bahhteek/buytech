@@ -23,14 +23,33 @@ function smtp_cmd($fp, $cmd, $expect)
     return $response;
 }
 
+function mail_from_header()
+{
+    return env('SMTP_FROM', 'BuyTech <info@buytech.kz>');
+}
+
+function mail_from_address()
+{
+    $from = mail_from_header();
+    if (preg_match('/<([^>]+)>/', $from, $match)) {
+        return $match[1];
+    }
+    return $from !== '' ? $from : 'info@buytech.kz';
+}
+
 function send_smtp($to, $subject, $body)
 {
     $host = env('SMTP_HOST');
     $port = (int) env('SMTP_PORT', '587');
     $secure = env('SMTP_SECURE') === 'true';
-    $user = env('SMTP_USER');
+    $user = env('SMTP_USER', 'info@buytech.kz');
     $pass = env('SMTP_PASS');
-    $from = env('SMTP_FROM', $user);
+    $from = mail_from_header();
+    $fromEmail = mail_from_address();
+    $ehlo = parse_url(site_url(), PHP_URL_HOST);
+    if (!$ehlo) {
+        $ehlo = 'buytech.kz';
+    }
 
     $remote = ($secure && $port === 465) ? 'ssl://' . $host . ':' . $port : 'tcp://' . $host . ':' . $port;
     $fp = @stream_socket_client($remote, $errno, $errstr, 20, STREAM_CLIENT_CONNECT);
@@ -39,7 +58,7 @@ function send_smtp($to, $subject, $body)
     }
     stream_set_timeout($fp, 20);
     smtp_read_line($fp);
-    smtp_cmd($fp, 'EHLO buytech.local', 250);
+    smtp_cmd($fp, 'EHLO ' . $ehlo, 250);
 
     if (!$secure && $port !== 465) {
         fwrite($fp, "STARTTLS\r\n");
@@ -48,19 +67,14 @@ function send_smtp($to, $subject, $body)
             if (!stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
                 throw new RuntimeException('SMTP STARTTLS failed');
             }
-            smtp_cmd($fp, 'EHLO buytech.local', 250);
+            smtp_cmd($fp, 'EHLO ' . $ehlo, 250);
         }
     }
 
-    if ($user !== '') {
+    if ($user !== '' && $pass !== '') {
         smtp_cmd($fp, 'AUTH LOGIN', 334);
         smtp_cmd($fp, base64_encode($user), 334);
         smtp_cmd($fp, base64_encode($pass), 235);
-    }
-
-    $fromEmail = $from;
-    if (preg_match('/<([^>]+)>/', $from, $match)) {
-        $fromEmail = $match[1];
     }
 
     smtp_cmd($fp, 'MAIL FROM:<' . $fromEmail . '>', 250);
@@ -80,10 +94,9 @@ function send_smtp($to, $subject, $body)
 
 function send_lead_email($lead)
 {
-    $to = env('LEADS_EMAIL', env('SMTP_USER'));
-    $host = env('SMTP_HOST');
+    $to = env('LEADS_EMAIL', 'info@buytech.kz');
     if ($to === '') {
-        return array('sent' => false, 'reason' => 'smtp_not_configured');
+        $to = 'info@buytech.kz';
     }
 
     $subject = 'Заявка BuyTech: ' . $lead['name'];
@@ -95,13 +108,28 @@ function send_lead_email($lead)
         'Дата: ' . $lead['createdAt'],
     ));
 
+    $host = env('SMTP_HOST');
     if ($host !== '') {
         send_smtp($to, $subject, $text);
         return array('sent' => true);
     }
 
-    $from = env('SMTP_FROM', 'noreply@localhost');
-    $headers = 'From: ' . $from . "\r\nContent-Type: text/plain; charset=UTF-8";
-    $ok = @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $text, $headers);
+    $from = mail_from_header();
+    $fromEmail = mail_from_address();
+    $reply = isset($lead['email']) && $lead['email'] !== '' ? $lead['email'] : $fromEmail;
+    $headers = array(
+        'From: ' . $from,
+        'Reply-To: ' . $reply,
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=UTF-8',
+        'Content-Transfer-Encoding: 8bit',
+        'X-Mailer: BuyTech',
+    );
+    $encodedSubject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+    $headerLine = implode("\r\n", $headers);
+    $ok = @mail($to, $encodedSubject, $text, $headerLine, '-f' . $fromEmail);
+    if (!$ok) {
+        $ok = @mail($to, $encodedSubject, $text, $headerLine);
+    }
     return $ok ? array('sent' => true) : array('sent' => false, 'reason' => 'send_failed');
 }

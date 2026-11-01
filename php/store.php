@@ -114,7 +114,38 @@ function update_db($mutator)
     fflush($fp);
     flock($fp, LOCK_UN);
     fclose($fp);
+    write_sitemap_file();
     return $db;
+}
+
+/** Число из «105 000 000» / «от 24 700 000 ₸». «Цена по запросу» → 0. */
+function parse_price_amount($price, $priceFrom = 0)
+{
+    $digits = preg_replace('/\D+/', '', (string) $price);
+    if ($digits !== '' && $digits !== '0') {
+        $value = (int) $digits;
+        if ($value > 0) {
+            return $value;
+        }
+    }
+    $priceFrom = (int) $priceFrom;
+    return $priceFrom > 0 ? $priceFrom : 0;
+}
+
+function machines_with_parsed_price($machines)
+{
+    if (!is_array($machines)) {
+        return array();
+    }
+    foreach ($machines as $index => $machine) {
+        if (!is_array($machine)) {
+            continue;
+        }
+        $price = isset($machine['price']) ? $machine['price'] : '';
+        $from = isset($machine['priceFrom']) ? $machine['priceFrom'] : 0;
+        $machines[$index]['priceFrom'] = parse_price_amount($price, $from);
+    }
+    return $machines;
 }
 
 function find_by_id($list, $id)

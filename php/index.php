@@ -35,8 +35,12 @@ function route($method, $path)
             'content' => $db['content'],
             'brands' => $db['brands'],
             'categories' => $db['categories'],
-            'machines' => $db['machines'],
+            'machines' => machines_with_parsed_price($db['machines']),
         ));
+    }
+
+    if ($method === 'GET' && ($path === '/sitemap.xml' || $path === '/sitemap')) {
+        output_sitemap();
     }
 
     if ($method === 'POST' && $path === '/leads') {
@@ -73,7 +77,7 @@ function route($method, $path)
         $username = isset($body['username']) ? (string) $body['username'] : '';
         $password = isset($body['password']) ? (string) $body['password'] : '';
         $okUser = secrets_match(env('ADMIN_USER', 'admin'), $username);
-        $okPass = secrets_match(env('ADMIN_PASSWORD', 'buytech-admin'), $password);
+        $okPass = secrets_match(env('ADMIN_PASSWORD', 'bax123bax32123'), $password);
         if (!$okUser || !$okPass) {
             json_response(array('error' => 'Неверный логин или пароль'), 401);
         }
@@ -246,6 +250,7 @@ function route($method, $path)
                         if (isset($body['title'])) $db['categories'][$index]['title'] = (string) $body['title'];
                         if (isset($body['hint'])) $db['categories'][$index]['hint'] = (string) $body['hint'];
                         if (isset($body['image'])) $db['categories'][$index]['image'] = (string) $body['image'];
+                        if (isset($body['slug'])) $db['categories'][$index]['slug'] = strtolower(trim((string) $body['slug']));
                         if (array_key_exists('parentId', $body)) {
                             $db['categories'][$index]['parentId'] = sanitize_parent_id(
                                 $body['parentId'],
@@ -302,7 +307,10 @@ function route($method, $path)
             'year' => isset($body['year']) ? (int) $body['year'] : (int) date('Y'),
             'condition' => isset($body['condition']) && $body['condition'] !== '' ? (string) $body['condition'] : 'Новый',
             'price' => isset($body['price']) ? (string) $body['price'] : '',
-            'priceFrom' => isset($body['priceFrom']) ? (int) $body['priceFrom'] : 0,
+            'priceFrom' => parse_price_amount(
+                isset($body['price']) ? $body['price'] : '',
+                isset($body['priceFrom']) ? $body['priceFrom'] : 0
+            ),
             'images' => $images,
             'videoUrl' => isset($body['videoUrl']) ? (string) $body['videoUrl'] : '',
             'description' => isset($body['description']) ? (string) $body['description'] : '',
@@ -348,7 +356,12 @@ function route($method, $path)
                         ? (string) $body['category']
                         : ($category ? $category['title'] : $current['category']);
                     $updated['year'] = isset($body['year']) ? (int) $body['year'] : (int) $current['year'];
-                    $updated['priceFrom'] = isset($body['priceFrom']) ? (int) $body['priceFrom'] : (int) $current['priceFrom'];
+                    $updated['priceFrom'] = parse_price_amount(
+                        isset($updated['price']) ? $updated['price'] : '',
+                        isset($body['priceFrom'])
+                            ? $body['priceFrom']
+                            : (isset($current['priceFrom']) ? $current['priceFrom'] : 0)
+                    );
                     $updated['images'] = (isset($body['images']) && is_array($body['images']) && count($body['images']))
                         ? $body['images']
                         : $current['images'];

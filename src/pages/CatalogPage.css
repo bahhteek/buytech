@@ -370,6 +370,14 @@
   color: var(--muted);
 }
 
+.catalog-toolbar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
 .catalog-sort {
   display: flex;
   align-items: center;
@@ -381,6 +389,7 @@
 }
 
 .catalog-sort select {
+  min-width: 11rem;
   min-height: 2.6rem;
   padding: 0.45rem 2rem 0.45rem 0.7rem;
   border: 2px solid var(--black);

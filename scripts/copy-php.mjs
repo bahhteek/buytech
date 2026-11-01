@@ -1,6 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { buildSitemapXml, buildSitemapTxt } from './write-sitemap.mjs'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
@@ -28,12 +30,25 @@ function copyDir(src, dest, skip = []) {
   }
 }
 
-copyDir(phpSrc, apiDest, ['dev-router.php'])
+copyDir(phpSrc, apiDest, ['dev-router.php', 'web-index.php', 'web-router.php'])
 
 const example = path.join(apiDest, 'config.example.php')
 const config = path.join(apiDest, 'config.php')
 if (!fs.existsSync(config) && fs.existsSync(example)) {
   fs.copyFileSync(example, config)
+}
+
+fs.copyFileSync(path.join(phpSrc, 'web-index.php'), path.join(dist, 'index.php'))
+fs.copyFileSync(path.join(phpSrc, 'web-router.php'), path.join(dist, 'router.php'))
+
+const builtIndex = path.join(dist, 'index.html')
+const spaTemplate = path.join(dist, 'spa-template.html')
+if (fs.existsSync(builtIndex)) {
+  fs.copyFileSync(builtIndex, spaTemplate)
+  fs.unlinkSync(builtIndex)
+}
+if (fs.existsSync(path.join(root, 'public', 'sitemap.php'))) {
+  fs.copyFileSync(path.join(root, 'public', 'sitemap.php'), path.join(dist, 'sitemap.php'))
 }
 
 fs.mkdirSync(dataDest, { recursive: true })
@@ -55,6 +70,24 @@ fs.mkdirSync(uploadsDest, { recursive: true })
 const uploadsSrc = path.join(root, 'public', 'uploads')
 if (fs.existsSync(uploadsSrc)) {
   copyDir(uploadsSrc, uploadsDest)
+}
+
+const dbPath = dbCandidates.find((item) => fs.existsSync(item))
+const sitemapXml = buildSitemapXml(dbPath || path.join(root, 'php', 'seed.json'))
+const sitemapTxt = buildSitemapTxt(dbPath || path.join(root, 'php', 'seed.json'))
+fs.writeFileSync(path.join(root, 'public', 'sitemap.xml'), sitemapXml)
+fs.writeFileSync(path.join(root, 'public', 'sitemap.txt'), sitemapTxt)
+fs.writeFileSync(path.join(dist, 'sitemap.xml'), sitemapXml)
+fs.writeFileSync(path.join(dist, 'sitemap.txt'), sitemapTxt)
+
+const written = spawnSync('php', [path.join(apiDest, 'write-sitemap.php')], {
+  cwd: root,
+  encoding: 'utf8',
+})
+if (written.status !== 0) {
+  console.warn('php write-sitemap skipped:', written.stderr || written.stdout || '')
+} else if (written.stdout) {
+  console.log(written.stdout.trim())
 }
 
 console.log('PHP API copied to dist/api')

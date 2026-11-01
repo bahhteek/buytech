@@ -1,12 +1,11 @@
-DirectoryIndex index.html
-
-<IfModule mod_headers.c>
-  Header set X-Robots-Tag "noindex, nofollow, noarchive"
-</IfModule>
+DirectoryIndex index.php
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  RewriteRule ^sitemap\.xml$ sitemap.php [QSA,L]
+  RewriteRule ^spa-template\.html$ - [F]
 
   RewriteCond %{HTTP:Authorization} .
   RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
@@ -18,5 +17,5 @@ DirectoryIndex index.html
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  RewriteRule ^ index.html [L]
+  RewriteRule ^ index.php [L]
 </IfModule>

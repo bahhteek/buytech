@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Footer, Header } from '../components/Layout'
 import { MachineCard } from '../components/MachineCard'
 import { useSite } from '../context/SiteContext'
+import { catalogCategoryPath } from '../categorySlug'
 import { rootCategories } from '../categoryTree'
 
 export function HomePage() {
@@ -62,7 +63,7 @@ export function HomePage() {
               <Link
                 key={category.id}
                 className="category"
-                to={`/catalog?category=${category.id}`}
+                to={catalogCategoryPath(category, categories)}
               >
                 <img src={category.image} alt={category.title} />
                 <div className="category-meta">

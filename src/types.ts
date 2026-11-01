@@ -14,6 +14,8 @@ export type Category = {
   title: string
   hint: string
   image: string
+  /** Public catalog URL segment. Empty → derived from title or id. */
+  slug?: string
   /** Empty / omitted = root category. Nested as deep as needed. */
   parentId?: string
 }
@@ -33,6 +35,8 @@ export type Machine = {
   videoUrl?: string
   description: string
   specs: Spec[]
+  /** Public product URL segment. Empty → derived from brand + name. */
+  slug?: string
   /** Explicit related machines for the product page; empty → auto by category/brand. */
   relatedIds?: string[]
 }
@@ -160,10 +164,28 @@ export function formatPrice(value: number) {
   return `${value.toLocaleString('ru-RU')} ₸`
 }
 
+/** Число из «105 000 000», «от 24 700 000 ₸». Текст вроде «Цена по запросу» → null. */
+export function parsePriceAmount(price: string, priceFrom = 0): number | null {
+  const digits = String(price || '').replace(/\D/g, '')
+  if (digits) {
+    const value = Number(digits)
+    if (Number.isFinite(value) && value > 0) return value
+  }
+  if (priceFrom > 0) return priceFrom
+  return null
+}
+
+export function machinePriceAmount(machine: Pick<Machine, 'price' | 'priceFrom'>): number | null {
+  return parsePriceAmount(machine.price, machine.priceFrom)
+}
+
 export function priceBoundsOf(machines: Machine[]) {
-  if (!machines.length) return { min: 0, max: 0 }
+  const amounts = machines
+    .map((machine) => machinePriceAmount(machine))
+    .filter((value): value is number => value != null)
+  if (!amounts.length) return { min: 0, max: 0 }
   return {
-    min: Math.min(...machines.map((m) => m.priceFrom)),
-    max: Math.max(...machines.map((m) => m.priceFrom)),
+    min: Math.min(...amounts),
+    max: Math.max(...amounts),
   }
 }

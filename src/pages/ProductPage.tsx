@@ -1,16 +1,28 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import { Fragment } from 'react'
 import { Footer, Header } from '../components/Layout'
 import { MachineCard } from '../components/MachineCard'
 import { ImageSlider, VideoEmbed } from '../components/Media'
 import { useSite } from '../context/SiteContext'
+import {
+  catalogCategoryPath,
+  findCategoryBySlugOrId,
+  findMachineBySlugOrId,
+  machinePath,
+} from '../categorySlug'
 import { categoryPath } from '../categoryTree'
 import './ProductPage.css'
 
 export function ProductPage() {
-  const { id } = useParams()
-  const { getMachineById, getRelatedMachines, categories, loading } = useSite()
-  const machine = id ? getMachineById(id) : undefined
+  const { id, productSlug } = useParams()
+  const location = useLocation()
+  const { getMachineById, getRelatedMachines, categories, machines, loading } = useSite()
+  const machine = productSlug
+    ? findMachineBySlugOrId(machines, productSlug)
+    : id
+      ? getMachineById(id)
+      : undefined
+  const prettyPath = machine ? machinePath(machine, categories, machines) : ''
 
   if (loading) {
     return (
@@ -22,6 +34,10 @@ export function ProductPage() {
         <Footer />
       </div>
     )
+  }
+
+  if (machine && prettyPath && location.pathname !== prettyPath) {
+    return <Navigate to={prettyPath} replace />
   }
 
   if (!machine) {
@@ -45,6 +61,7 @@ export function ProductPage() {
   const related = getRelatedMachines(machine)
   const requestLink = `/contacts?need=${encodeURIComponent(machine.name)}`
   const crumbs = categoryPath(categories, machine.categoryId)
+  const fallbackCategory = findCategoryBySlugOrId(categories, machine.categoryId)
 
   return (
     <div className="page product-page">
@@ -58,13 +75,19 @@ export function ProductPage() {
           {crumbs.map((item) => (
             <Fragment key={item.id}>
               <span>/</span>
-              <Link to={`/catalog?category=${item.id}`}>{item.title}</Link>
+              <Link to={catalogCategoryPath(item, categories)}>{item.title}</Link>
             </Fragment>
           ))}
           {crumbs.length === 0 && (
             <>
               <span>/</span>
-              <Link to={`/catalog?category=${machine.categoryId}`}>{machine.category}</Link>
+              {fallbackCategory ? (
+                <Link to={catalogCategoryPath(fallbackCategory, categories)}>
+                  {fallbackCategory.title}
+                </Link>
+              ) : (
+                <span>{machine.category}</span>
+              )}
             </>
           )}
           <span>/</span>

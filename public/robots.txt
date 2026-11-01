@@ -1,8 +1,12 @@
 User-agent: *
-Disallow: /
+Allow: /
+Allow: /sitemap.php
+Allow: /sitemap.txt
+Allow: /uploads
+Allow: /api/index.php/public
+Disallow: /admin
+Disallow: /api
+Disallow: /spa-template.html
 
-User-agent: Googlebot
-Disallow: /
-
-User-agent: Yandex
-Disallow: /
+Sitemap: https://buytech.kz/sitemap.php
+Sitemap: https://buytech.kz/sitemap.txt

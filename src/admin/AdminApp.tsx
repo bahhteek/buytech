@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } 
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { api, AUTH_LOST_EVENT, clearAdminToken, getAdminToken, setAdminToken } from '../api/client'
 import type { AboutContent, Brand, Category, Lead, Machine, SiteContent, Spec } from '../types'
-import { normalizeAbout } from '../types'
+import { normalizeAbout, parsePriceAmount } from '../types'
 import { useSite } from '../context/SiteContext'
 import { machinesInCategory } from '../catalogFilters'
 import {
@@ -71,7 +71,6 @@ function AdminLogin() {
         <button className="btn btn-primary" type="submit">
           Войти
         </button>
-        <p className="admin-hint">По умолчанию: admin / buytech-admin</p>
       </form>
     </div>
   )
@@ -599,14 +598,24 @@ function ContentAdmin() {
           </ContentBlock>
           <ContentBlock title="Реквизиты" description="Показываются на странице контактов и в футере.">
             <ContentField
-              label="Телефон"
+              label="Телефон 1"
               value={draft.contacts?.phone || ''}
               onChange={(v) => setSection('contacts', 'phone', v)}
             />
             <ContentField
-              label="WhatsApp"
+              label="Телефон 2"
+              value={draft.contacts?.phone2 || ''}
+              onChange={(v) => setSection('contacts', 'phone2', v)}
+            />
+            <ContentField
+              label="WhatsApp 1"
               value={draft.contacts?.whatsapp || ''}
               onChange={(v) => setSection('contacts', 'whatsapp', v)}
+            />
+            <ContentField
+              label="WhatsApp 2"
+              value={draft.contacts?.whatsapp2 || ''}
+              onChange={(v) => setSection('contacts', 'whatsapp2', v)}
             />
             <ContentField
               label="Email"
@@ -1105,8 +1114,15 @@ function MachinesAdmin() {
             Цена (текст)
             <input
               value={draft.price || ''}
-              onChange={(e) => setDraft((p) => ({ ...p, price: e.target.value }))}
-              placeholder="от 24 700 000 ₸"
+              onChange={(e) => {
+                const price = e.target.value
+                setDraft((p) => ({
+                  ...p,
+                  price,
+                  priceFrom: parsePriceAmount(price, 0) ?? 0,
+                }))
+              }}
+              placeholder="105 000 000"
             />
           </label>
           <label>
@@ -1484,6 +1500,20 @@ function LeadsAdmin() {
 }
 
 export function AdminApp() {
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="robots"]')
+    const previous = meta?.getAttribute('content') ?? ''
+    if (meta) {
+      meta.setAttribute('content', 'noindex, nofollow, noarchive')
+    }
+    return () => {
+      const current = document.querySelector('meta[name="robots"]')
+      if (current) {
+        current.setAttribute('content', previous || 'index, follow')
+      }
+    }
+  }, [])
+
   return (
     <Routes>
       <Route path="login" element={<AdminLogin />} />

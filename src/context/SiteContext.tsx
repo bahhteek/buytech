@@ -62,6 +62,12 @@ export function SiteProvider({ children }: { children: ReactNode }) {
     void refresh()
   }, [refresh])
 
+  useEffect(() => {
+    if (!loading && data.machines.length > 0) {
+      document.getElementById('seo-prerender')?.remove()
+    }
+  }, [loading, data.machines.length])
+
   const value = useMemo<SiteContextValue>(() => {
     const machines = data.machines.map((machine) => ({
       ...machine,

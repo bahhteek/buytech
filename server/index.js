@@ -17,7 +17,7 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true })
 const app = express()
 const PORT = process.env.PORT || 5174
 const ADMIN_USER = process.env.ADMIN_USER || 'admin'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'buytech-admin'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'bax123bax32123'
 const tokens = new Set()
 
 app.use(cors())
@@ -91,6 +91,22 @@ async function sendLeadEmail(lead) {
   return { sent: true }
 }
 
+function parsePriceAmount(price, priceFrom = 0) {
+  const digits = String(price || '').replace(/\D/g, '')
+  if (digits) {
+    const value = Number(digits)
+    if (Number.isFinite(value) && value > 0) return value
+  }
+  return Number(priceFrom) > 0 ? Number(priceFrom) : 0
+}
+
+function machinesWithParsedPrice(machines) {
+  return (machines || []).map((machine) => ({
+    ...machine,
+    priceFrom: parsePriceAmount(machine.price, machine.priceFrom),
+  }))
+}
+
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
 app.get('/api/public', (_req, res) => {
@@ -99,7 +115,7 @@ app.get('/api/public', (_req, res) => {
     content: db.content,
     brands: db.brands,
     categories: db.categories,
-    machines: db.machines,
+    machines: machinesWithParsedPrice(db.machines),
   })
 })
 
@@ -301,7 +317,7 @@ app.post('/api/admin/machines', auth, (req, res) => {
     year: Number(body.year) || new Date().getFullYear(),
     condition: String(body.condition || 'Новый'),
     price: String(body.price || ''),
-    priceFrom: Number(body.priceFrom) || 0,
+    priceFrom: parsePriceAmount(body.price, body.priceFrom),
     images: Array.isArray(body.images) && body.images.length ? body.images : ['/images/excavator.jpg'],
     videoUrl: String(body.videoUrl || ''),
     description: String(body.description || ''),
@@ -347,7 +363,7 @@ app.put('/api/admin/machines/:id', auth, (req, res) => {
       categoryId: category?.id || current.categoryId,
       category: body.category || category?.title || current.category,
       year: Number(body.year ?? current.year),
-      priceFrom: Number(body.priceFrom ?? current.priceFrom),
+      priceFrom: parsePriceAmount(body.price ?? current.price, body.priceFrom ?? current.priceFrom),
       images:
         Array.isArray(body.images) && body.images.length ? body.images : current.images,
       specs: Array.isArray(body.specs)

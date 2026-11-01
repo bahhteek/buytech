@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { machinePath } from '../categorySlug'
+import { useSite } from '../context/SiteContext'
 import type { Machine } from '../types'
 import { machineCover } from '../types'
 
@@ -7,9 +9,11 @@ type MachineCardProps = {
 }
 
 export function MachineCard({ machine }: MachineCardProps) {
+  const { categories, machines } = useSite()
+  const href = machinePath(machine, categories, machines)
   return (
     <article className="machine">
-      <Link className="machine-photo" to={`/catalog/${machine.id}`}>
+      <Link className="machine-photo" to={href}>
         <img src={machineCover(machine)} alt={machine.name} />
         <span className="machine-badge">{machine.condition}</span>
       </Link>
@@ -19,7 +23,7 @@ export function MachineCard({ machine }: MachineCardProps) {
           <span className="machine-type">{machine.category}</span>
         </div>
         <h3>
-          <Link to={`/catalog/${machine.id}`}>{machine.name}</Link>
+          <Link to={href}>{machine.name}</Link>
         </h3>
         <dl className="machine-specs">
           <div>
@@ -33,7 +37,7 @@ export function MachineCard({ machine }: MachineCardProps) {
         </dl>
         <div className="machine-foot">
           <strong>{machine.price}</strong>
-          <Link to={`/catalog/${machine.id}`}>Подробнее</Link>
+          <Link to={href}>Подробнее</Link>
         </div>
       </div>
     </article>

@@ -10,11 +10,13 @@ if (basename($apiDir) === 'php') {
     define('BUYTECH_UPLOADS', BUYTECH_ROOT . '/public/uploads');
     define('BUYTECH_DATA', BUYTECH_ROOT . '/data');
     define('BUYTECH_SEED', $apiDir . '/seed.json');
+    define('BUYTECH_SITEMAP', BUYTECH_ROOT . '/public/sitemap.xml');
 } else {
     define('BUYTECH_ROOT', $root);
     define('BUYTECH_UPLOADS', BUYTECH_ROOT . '/uploads');
     define('BUYTECH_DATA', BUYTECH_ROOT . '/data');
     define('BUYTECH_SEED', $apiDir . '/seed.json');
+    define('BUYTECH_SITEMAP', BUYTECH_ROOT . '/sitemap.xml');
 }
 
 define('BUYTECH_DB', BUYTECH_DATA . '/db.json');
@@ -195,6 +197,27 @@ function bearer_token()
     return '';
 }
 
+function site_url()
+{
+    $url = rtrim((string) env('SITE_URL', 'https://buytech.kz'), '/');
+    if ($url !== '') {
+        return $url;
+    }
+    $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+        $https = true;
+    }
+    $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'buytech.kz';
+    return ($https ? 'https' : 'http') . '://' . $host;
+}
+
+function xml_escape($value)
+{
+    return htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+}
+
 require_once __DIR__ . '/store.php';
+require_once __DIR__ . '/slugs.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/mail.php';
+require_once __DIR__ . '/sitemap.php';

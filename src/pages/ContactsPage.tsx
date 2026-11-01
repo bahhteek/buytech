@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { Footer, Header } from '../components/Layout'
+import { DEFAULT_CONTACTS, telHref, waHref } from '../contactLinks'
 import { useSite } from '../context/SiteContext'
 import './ContactsPage.css'
 
@@ -23,16 +24,19 @@ export function ContactsPage() {
     setForm((prev) => ({ ...prev, need: needFromQuery }))
   }, [needFromQuery])
 
+  const phone = contacts.phone || DEFAULT_CONTACTS.phone
+  const phone2 = contacts.phone2 || DEFAULT_CONTACTS.phone2
+  const whatsapp = contacts.whatsapp || DEFAULT_CONTACTS.whatsapp
+  const whatsapp2 = contacts.whatsapp2 || DEFAULT_CONTACTS.whatsapp2
+
   const items = [
-    { label: 'Телефон', value: contacts.phone || '+7 (700) 123-45-67', href: `tel:${(contacts.phone || '+77001234567').replace(/\D/g, '')}` },
-    {
-      label: 'WhatsApp',
-      value: contacts.whatsapp || contacts.phone || '+7 (700) 123-45-67',
-      href: `https://wa.me/${(contacts.whatsapp || contacts.phone || '77001234567').replace(/\D/g, '')}`,
-    },
-    { label: 'Email', value: contacts.email || 'hello@buytech.kz', href: `mailto:${contacts.email || 'hello@buytech.kz'}` },
-    { label: 'Адрес', value: contacts.address || 'г. Алматы, Казахстан' },
-    { label: 'Режим работы', value: contacts.hours || 'Пн–Сб, 09:00–19:00' },
+    { id: 'phone', label: 'Телефон 1', value: phone, href: telHref(phone) },
+    { id: 'phone2', label: 'Телефон 2', value: phone2, href: telHref(phone2) },
+    { id: 'whatsapp', label: 'WhatsApp 1', value: whatsapp, href: waHref(whatsapp) },
+    { id: 'whatsapp2', label: 'WhatsApp 2', value: whatsapp2, href: waHref(whatsapp2) },
+    { id: 'email', label: 'Email', value: contacts.email || 'hello@buytech.kz', href: `mailto:${contacts.email || 'hello@buytech.kz'}` },
+    { id: 'address', label: 'Адрес', value: contacts.address || 'г. Алматы, Казахстан' },
+    { id: 'hours', label: 'Режим работы', value: contacts.hours || 'Пн–Сб, 09:00–19:00' },
   ]
 
   return (
@@ -55,7 +59,7 @@ export function ContactsPage() {
             </p>
             <ul className="contacts-list">
               {items.map((item) => (
-                <li key={item.label}>
+                <li key={item.id}>
                   <span>{item.label}</span>
                   {item.href ? (
                     <a

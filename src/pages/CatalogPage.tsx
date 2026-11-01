@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { formatPrice } from '../types'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { formatPrice, machinePriceAmount } from '../types'
 import {
   brandsInPool,
   machineMatchesSpecs,
@@ -10,9 +10,11 @@ import {
   toggleListValue,
 } from '../catalogFilters'
 import { Footer, Header } from '../components/Layout'
+import { NotFoundPage } from './NotFoundPage'
 import { MachineCard } from '../components/MachineCard'
 import { useSite } from '../context/SiteContext'
 import type { Category, Machine } from '../types'
+import { catalogCategoryPath, findCategoryBySlugOrId } from '../categorySlug'
 import { childCategories } from '../categoryTree'
 import './CatalogPage.css'
 
@@ -28,20 +30,38 @@ const sortOptions: { value: SortKey; label: string }[] = [
   { value: 'year-desc', label: 'Сначала новее' },
 ]
 
+function machineBrand(machine: Machine) {
+  return (machine.brand || machine.brandId || '').trim()
+}
+
+function compareByPrice(a: Machine, b: Machine, direction: 'asc' | 'desc') {
+  const left = machinePriceAmount(a)
+  const right = machinePriceAmount(b)
+  if (left == null && right == null) {
+    return a.name.localeCompare(b.name, 'ru', { numeric: true })
+  }
+  if (left == null) return 1
+  if (right == null) return -1
+  return direction === 'desc' ? right - left : left - right
+}
+
 function sortMachines(list: Machine[], sort: SortKey) {
   const next = [...list]
   next.sort((a, b) => {
     switch (sort) {
       case 'price-asc':
-        return a.priceFrom - b.priceFrom
+        return compareByPrice(a, b, 'asc')
       case 'price-desc':
-        return b.priceFrom - a.priceFrom
+        return compareByPrice(a, b, 'desc')
       case 'name':
-        return a.name.localeCompare(b.name, 'ru')
+        return a.name.localeCompare(b.name, 'ru', { numeric: true })
       case 'brand':
-        return a.brand.localeCompare(b.brand, 'ru') || a.priceFrom - b.priceFrom
+        return (
+          machineBrand(a).localeCompare(machineBrand(b), 'ru', { sensitivity: 'base' }) ||
+          a.name.localeCompare(b.name, 'ru', { numeric: true })
+        )
       case 'year-desc':
-        return b.year - a.year || a.priceFrom - b.priceFrom
+        return b.year - a.year || a.name.localeCompare(b.name, 'ru', { numeric: true })
       default:
         return 0
     }
@@ -122,9 +142,12 @@ function CategoryFilterNode({
 }
 
 export function CatalogPage() {
-  const { categories, machines, content, priceBounds } = useSite()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const categoryFromUrl = searchParams.get('category') ?? 'all'
+  const { categories, machines, content, priceBounds, loading } = useSite()
+  const navigate = useNavigate()
+  const { categorySlug: routeSlug, id: legacyId } = useParams()
+  const routeId = routeSlug || legacyId
+  const [searchParams] = useSearchParams()
+  const categoryFromQuery = searchParams.get('category')
   const [priceMin, setPriceMin] = useState(0)
   const [priceMax, setPriceMax] = useState(0)
   const [sort, setSort] = useState<SortKey>('price-asc')
@@ -146,9 +169,24 @@ export function CatalogPage() {
     setPriceMax(bounds.max)
   }, [bounds.min, bounds.max])
 
-  const selectedCategory = categories.some((c) => c.id === categoryFromUrl)
-    ? categoryFromUrl
-    : 'all'
+  const categoryFromRoute = routeId ? findCategoryBySlugOrId(categories, routeId) : undefined
+  const selectedCategory = categoryFromRoute?.id || 'all'
+
+  useEffect(() => {
+    if (!categoryFromQuery || categoryFromQuery === 'all') return
+    const category = findCategoryBySlugOrId(categories, categoryFromQuery)
+    if (category) {
+      navigate(catalogCategoryPath(category, categories), { replace: true })
+    }
+  }, [categoryFromQuery, categories, navigate])
+
+  useEffect(() => {
+    if (!routeId || !categoryFromRoute) return
+    const pretty = catalogCategoryPath(categoryFromRoute, categories)
+    if (pretty !== `/${routeId}`) {
+      navigate(pretty, { replace: true })
+    }
+  }, [routeId, categoryFromRoute, categories, navigate])
 
   const categoryPool = useMemo(
     () => machinesInCategory(machines, selectedCategory, categories),
@@ -172,7 +210,8 @@ export function CatalogPage() {
         !selectedBrands.length ||
         selectedBrands.includes(machine.brandId) ||
         selectedBrands.includes(machine.brand)
-      const byPrice = machine.priceFrom >= priceMin && machine.priceFrom <= priceMax
+      const amount = machinePriceAmount(machine)
+      const byPrice = amount == null || (amount >= priceMin && amount <= priceMax)
       const bySpecs = machineMatchesSpecs(machine, selectedSpecs)
       return byBrand && byPrice && bySpecs
     })
@@ -191,10 +230,11 @@ export function CatalogPage() {
     setSelectedBrands([])
     setSelectedSpecs({})
     if (id === 'all') {
-      setSearchParams({})
+      navigate('/catalog')
       return
     }
-    setSearchParams({ category: id })
+    const category = findCategoryBySlugOrId(categories, id)
+    navigate(category ? catalogCategoryPath(category, categories) : '/catalog')
   }
 
   function toggleBrand(id: string) {
@@ -219,7 +259,14 @@ export function CatalogPage() {
     setSort('price-asc')
     setSelectedBrands([])
     setSelectedSpecs({})
-    setSearchParams({})
+    if (selectedCategory !== 'all') {
+      const category = findCategoryBySlugOrId(categories, selectedCategory)
+      if (category) {
+        navigate(catalogCategoryPath(category, categories))
+        return
+      }
+    }
+    navigate('/catalog')
   }
 
   function onMinChange(value: number) {
@@ -240,6 +287,10 @@ export function CatalogPage() {
   const hasExtraFilters =
     selectedBrands.length > 0 || Object.keys(selectedSpecs).length > 0
 
+  if (!loading && routeId && !categoryFromRoute) {
+    return <NotFoundPage />
+  }
+
   return (
     <div className="page catalog-page">
       <Header />
@@ -247,8 +298,16 @@ export function CatalogPage() {
       <main className="catalog-main">
         <div className="catalog-top">
           <p className="catalog-kicker">Каталог</p>
-          <h1>{content.catalog?.title || 'Спецтехника из Китая'}</h1>
-          <p>{content.catalog?.lead}</p>
+          <h1>
+            {categoryFromRoute
+              ? categoryFromRoute.title
+              : content.catalog?.title || 'Купить спецтехнику из Китая'}
+          </h1>
+          <p>
+            {categoryFromRoute
+              ? `Купить ${categoryFromRoute.title.toLowerCase()} из Китая в Казахстан — новые машины, документы и доставка на объект.`
+              : content.catalog?.lead}
+          </p>
         </div>
 
         <div className="catalog-layout">
@@ -288,6 +347,7 @@ export function CatalogPage() {
               <FilterBlock
                 title="Марка"
                 open={openBlocks.brand !== false}
+                hint={selectedBrands.length ? String(selectedBrands.length) : undefined}
                 onToggle={() =>
                   setOpenBlocks((prev) => ({ ...prev, brand: prev.brand === false }))
                 }
@@ -393,19 +453,52 @@ export function CatalogPage() {
                 Найдено: <strong>{filtered.length}</strong>
                 {hasExtraFilters ? <span className="catalog-toolbar-hint"> · фильтры активны</span> : null}
               </p>
-              <label className="catalog-sort">
-                <span>Сортировка</span>
-                <select
-                  value={sort}
-                  onChange={(event) => setSort(event.target.value as SortKey)}
-                >
-                  {sortOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="catalog-toolbar-controls">
+                {brandOptions.length > 0 ? (
+                  <label className="catalog-sort">
+                    <span>Марка</span>
+                    <select
+                      value={
+                        selectedBrands.length === 1
+                          ? selectedBrands[0]
+                          : selectedBrands.length > 1
+                            ? '__multi'
+                            : ''
+                      }
+                      onChange={(event) => {
+                        const id = event.target.value
+                        if (id === '__multi') return
+                        setSelectedBrands(id ? [id] : [])
+                      }}
+                    >
+                      <option value="">Все марки</option>
+                      {selectedBrands.length > 1 ? (
+                        <option value="__multi" disabled>
+                          Несколько марок
+                        </option>
+                      ) : null}
+                      {brandOptions.map((brand) => (
+                        <option key={brand.id} value={brand.id}>
+                          {brand.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                <label className="catalog-sort">
+                  <span>Сортировка</span>
+                  <select
+                    value={sort}
+                    onChange={(event) => setSort(event.target.value as SortKey)}
+                  >
+                    {sortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
 
             {filtered.length > 0 ? (
