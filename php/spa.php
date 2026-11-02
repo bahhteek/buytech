@@ -95,7 +95,7 @@ function spa_fill_category($page, $category, $categories, $machines)
     $ids = category_descendant_ids($categories, $category['id']);
     $items = '';
     foreach ($machines as $item) {
-        if (empty($item['id']) || empty($item['name']) || empty($item['categoryId']) || !in_array($item['categoryId'], $ids, true)) {
+        if (empty($item['id']) || empty($item['name']) || !machine_is_public($item) || empty($item['categoryId']) || !in_array($item['categoryId'], $ids, true)) {
             continue;
         }
         $items .= '<li><a href="' . html_escape(catalog_machine_path($item, $categories, $machines)) . '">' . html_escape($item['name']) . '</a></li>';
@@ -108,6 +108,9 @@ function spa_fill_machine($page, $machine, $categories, $machines)
 {
     $pretty = catalog_machine_path($machine, $categories, $machines);
     $page['canonical'] = spa_absolute_url($pretty);
+    if (!machine_is_public($machine)) {
+        $page['noindex'] = true;
+    }
     $name = isset($machine['name']) ? (string) $machine['name'] : 'Техника';
     $brand = isset($machine['brand']) ? (string) $machine['brand'] : '';
     $category = isset($machine['category']) ? (string) $machine['category'] : '';
@@ -320,7 +323,7 @@ function spa_page($path)
         $body .= '</ul><h2>Техника</h2><ul>';
         $shown = 0;
         foreach ($machines as $machine) {
-            if (empty($machine['id']) || empty($machine['name'])) {
+            if (empty($machine['id']) || empty($machine['name']) || !machine_is_public($machine)) {
                 continue;
             }
             $body .= '<li><a href="' . html_escape(catalog_machine_path($machine, $categories, $machines)) . '">' . html_escape($machine['name']) . '</a></li>';
@@ -347,7 +350,7 @@ function spa_page($path)
             $items .= '<li><a href="' . html_escape(catalog_category_path($category, $categories)) . '">' . html_escape($category['title']) . '</a></li>';
         }
         foreach ($machines as $machine) {
-            if (empty($machine['id']) || empty($machine['name'])) {
+            if (empty($machine['id']) || empty($machine['name']) || !machine_is_public($machine)) {
                 continue;
             }
             $href = catalog_machine_path($machine, $categories, $machines);
@@ -432,6 +435,22 @@ function spa_page($path)
         $page['description'] = 'Условия использования сайта BuyTech.';
         $page['body'] = '<h1>Пользовательское соглашение</h1><p>Используя сайт BuyTech, вы принимаете условия соглашения.</p>';
         return array($page, $status);
+    }
+
+    if (preg_match('#^/brand/([^/]+)$#', $path, $match)) {
+        $brands = isset($db['brands']) && is_array($db['brands']) ? $db['brands'] : array();
+        $brand = find_brand_by_slug_or_id($brands, rawurldecode($match[1]));
+        if ($brand) {
+            $name = (string) $brand['name'];
+            $page['title'] = spa_plain($name . ' — спецтехника из Китая', 70) . ' | BuyTech';
+            $lead = !empty($brand['shortText'])
+                ? (string) $brand['shortText']
+                : ('Новая техника ' . $name . ' с завода в Китае: поставка в Казахстан.');
+            $page['description'] = spa_plain($lead, 180);
+            $page['canonical'] = spa_absolute_url('/brand/' . brand_slug_map($brands)[$brand['id']]);
+            $page['body'] = '<h1>' . html_escape($name) . '</h1><p>' . html_escape($lead) . '</p>';
+            return array($page, 200);
+        }
     }
 
     if (preg_match('#^/([^/]+)/([^/]+)$#', $path, $match)) {

@@ -7,6 +7,10 @@ export type Spec = {
 export type Brand = {
   id: string
   name: string
+  slug?: string
+  bannerImage?: string
+  shortText?: string
+  article?: string
 }
 
 export type Category = {
@@ -33,6 +37,9 @@ export type Machine = {
   priceFrom: number
   images: string[]
   videoUrl?: string
+  videos?: string[]
+  /** Hidden from the catalog until published. Direct link still opens the page. */
+  draft?: boolean
   description: string
   specs: Spec[]
   /** Public product URL segment. Empty → derived from brand + name. */
@@ -47,8 +54,36 @@ export type Lead = {
   phone: string
   email: string
   need: string
+  page?: string
+  machineId?: string
+  visitor?: string
+  session?: string
+  source?: string
+  country?: string
+  city?: string
   createdAt: string
   status: 'new' | 'done' | 'deleted' | string
+}
+
+export type AnalyticsRange = 'day' | 'week' | 'month' | 'year' | 'all'
+
+export type AnalyticsReport = {
+  range: AnalyticsRange
+  summary: {
+    views: number
+    visitors: number
+    sessions: number
+    leads: number
+    conversion: number
+  }
+  series: { date: string; label: string; views: number; visitors: number; leads: number }[]
+  pages: { path: string; title: string; views: number; visitors: number; leads: number; conversion: number }[]
+  machines: { id: string; views: number; visitors: number; leads: number; conversion: number }[]
+  sources: { source: string; views: number; leads: number }[]
+  devices: { device: string; views: number }[]
+  places: { label: string; views: number; visitors: number; leads: number }[]
+  searches: { query: string; count: number }[]
+  telegram: { configured: boolean }
 }
 
 export type AboutRole = {
@@ -158,6 +193,13 @@ export type PublicPayload = {
 
 export function machineCover(machine: Machine) {
   return machine.images?.[0] || '/images/excavator.jpg'
+}
+
+export function machineVideos(machine: Pick<Machine, 'videos' | 'videoUrl'>) {
+  const list = (machine.videos || []).map((item) => item.trim()).filter(Boolean)
+  if (list.length) return list
+  const single = machine.videoUrl?.trim()
+  return single ? [single] : []
 }
 
 export function formatPrice(value: number) {

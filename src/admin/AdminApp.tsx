@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { api, AUTH_LOST_EVENT, clearAdminToken, getAdminToken, setAdminToken } from '../api/client'
-import type { AboutContent, Brand, Category, Lead, Machine, SiteContent, Spec } from '../types'
-import { normalizeAbout, parsePriceAmount } from '../types'
+import type { AboutContent, Lead, SiteContent } from '../types'
+import { normalizeAbout } from '../types'
 import { useSite } from '../context/SiteContext'
-import { machinesInCategory } from '../catalogFilters'
-import {
-  categoryOptionLabel,
-  descendantIds,
-  flattenCategoryTree,
-} from '../categoryTree'
+import { Logo } from '../components/Layout'
+import { BrandEditor, BrandsAdmin } from './BrandPages'
+import { CategoriesAdmin, CategoryEditor } from './CategoryPages'
+import { MachineEditor, MachinesAdmin } from './MachinePages'
+import { StatsPage } from './StatsPage'
 import './admin.css'
 
 function requireAuth() {
@@ -92,26 +91,98 @@ function AdminShell({ children }: { children: ReactNode }) {
   return (
     <div className="admin-shell">
       <aside className="admin-aside">
-        <Link className="logo" to="/admin">
-          Buy<span>Tech</span> Admin
+        <Link className="logo" to="/admin" aria-label="buytechkz">
+          <Logo tone="on-dark" />
         </Link>
         <nav>
-          <Link to="/admin">Обзор</Link>
-          <Link to="/admin/content">Контент</Link>
-          <Link to="/admin/faq">FAQ</Link>
-          <Link to="/admin/categories">Категории</Link>
-          <Link to="/admin/brands">Марки</Link>
-          <Link to="/admin/machines">Техника</Link>
-          <Link to="/admin/leads">Заявки</Link>
+          <NavLink to="/admin" end>Обзор</NavLink>
+          <NavLink to="/admin/content">Контент</NavLink>
+          <NavLink to="/admin/faq">FAQ</NavLink>
+          <NavLink to="/admin/categories">Категории</NavLink>
+          <NavLink to="/admin/brands">Марки</NavLink>
+          <NavLink to="/admin/machines">Техника</NavLink>
+          <NavLink to="/admin/stats">Статистика</NavLink>
+          <NavLink to="/admin/leads">Заявки</NavLink>
         </nav>
-        <div className="admin-aside-foot">
-          <Link to="/">На сайт</Link>
-          <button type="button" onClick={() => void logout()}>
-            Выйти
-          </button>
-        </div>
       </aside>
-      <main className="admin-main">{children}</main>
+      <div className="admin-body">
+        <header className="admin-top">
+          <AdminSearch />
+          <div className="admin-top-actions">
+            <Link className="btn btn-dark" to="/" target="_blank" rel="noreferrer">
+              На сайт
+            </Link>
+            <button className="btn btn-primary" type="button" onClick={() => void logout()}>
+              Выйти
+            </button>
+          </div>
+        </header>
+        <main className="admin-main">{children}</main>
+      </div>
+    </div>
+  )
+}
+
+function AdminSearch() {
+  const { allMachines, categories, brands } = useSite()
+  const navigate = useNavigate()
+  const [query, setQuery] = useState('')
+  const q = query.trim().toLowerCase()
+  const hits = useMemo(() => {
+    if (!q) return []
+    const items: { to: string; title: string; meta: string }[] = []
+    for (const machine of allMachines) {
+      const hay = `${machine.name} ${machine.brand} ${machine.category}`.toLowerCase()
+      if (hay.includes(q)) {
+        items.push({
+          to: `/admin/machines/${machine.id}`,
+          title: machine.name,
+          meta: `Техника · ${machine.brand}${machine.draft ? ' · скрыта' : ''}`,
+        })
+      }
+    }
+    for (const category of categories) {
+      if (category.title.toLowerCase().includes(q)) {
+        items.push({ to: `/admin/categories/${category.id}`, title: category.title, meta: 'Категория' })
+      }
+    }
+    for (const brand of brands) {
+      if (brand.name.toLowerCase().includes(q)) {
+        items.push({ to: `/admin/brands/${brand.id}`, title: brand.name, meta: 'Марка' })
+      }
+    }
+    return items.slice(0, 12)
+  }, [q, allMachines, categories, brands])
+
+  return (
+    <div className="admin-search">
+      <input
+        value={query}
+        placeholder="Поиск техники, категории или марки"
+        onChange={(event) => setQuery(event.target.value)}
+        aria-label="Поиск"
+      />
+      {q && (
+        <div className="admin-search-results">
+          {hits.length ? (
+            hits.map((hit) => (
+              <button
+                key={hit.to}
+                type="button"
+                onClick={() => {
+                  setQuery('')
+                  navigate(hit.to)
+                }}
+              >
+                <strong>{hit.title}</strong>
+                <span>{hit.meta}</span>
+              </button>
+            ))
+          ) : (
+            <p>Ничего не найдено</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -162,7 +233,7 @@ function Guard({ children }: { children: ReactNode }) {
 }
 
 function AdminHome() {
-  const { machines, categories, brands } = useSite()
+  const { allMachines, categories, brands } = useSite()
   const [leadsCount, setLeadsCount] = useState(0)
 
   useEffect(() => {
@@ -174,7 +245,7 @@ function AdminHome() {
       <h1>Обзор</h1>
       <div className="admin-stats">
         <article>
-          <strong>{machines.length}</strong>
+          <strong>{allMachines.length}</strong>
           <span>Техника</span>
         </article>
         <article>
@@ -764,603 +835,6 @@ function FaqAdmin() {
   )
 }
 
-function CategoriesAdmin() {
-  const { categories, refresh } = useSite()
-  const [title, setTitle] = useState('')
-  const [hint, setHint] = useState('')
-  const [image, setImage] = useState('/images/excavator.jpg')
-  const [parentId, setParentId] = useState('')
-  const tree = flattenCategoryTree(categories)
-
-  async function create() {
-    if (!title.trim()) return
-    await api.createCategory({ title: title.trim(), hint, image, parentId })
-    setTitle('')
-    setHint('')
-    await refresh()
-  }
-
-  async function onUpload(file: File, category: Category) {
-    const { url } = await api.upload(file)
-    await api.updateCategory(category.id, { image: url })
-    await refresh()
-  }
-
-  async function remove(category: Category) {
-    const kids = flattenCategoryTree(categories, category.id)
-    const extra = kids.length ? ` Вместе с ней удалятся ${kids.length} подкатегорий.` : ''
-    if (!confirm(`Удалить «${category.title}»?${extra}`)) return
-    await api.deleteCategory(category.id)
-    if (parentId === category.id) setParentId('')
-    await refresh()
-  }
-
-  return (
-    <div className="admin-section">
-      <h1>Категории</h1>
-      <div className="admin-card">
-        <h2>{parentId ? 'Добавить подкатегорию' : 'Добавить категорию'}</h2>
-        <div className="admin-inline">
-          <input placeholder="Название" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <input placeholder="Подпись" value={hint} onChange={(e) => setHint(e.target.value)} />
-          <input placeholder="URL фото" value={image} onChange={(e) => setImage(e.target.value)} />
-          <select value={parentId} onChange={(e) => setParentId(e.target.value)} aria-label="Родитель">
-            <option value="">Корневая категория</option>
-            {tree.map(({ category, depth }) => (
-              <option key={category.id} value={category.id}>
-                {categoryOptionLabel(category.title, depth)}
-              </option>
-            ))}
-          </select>
-          <button className="btn btn-primary" type="button" onClick={() => void create()}>
-            Добавить
-          </button>
-        </div>
-      </div>
-      <div className="admin-list">
-        {tree.map(({ category, depth }) => (
-          <div
-            className="admin-card admin-cat-card"
-            key={category.id}
-            style={{ marginLeft: `${depth * 1.5}rem` }}
-          >
-            <img src={category.image} alt="" className="admin-thumb" />
-            <input
-              value={category.title}
-              onChange={(e) => {
-                category.title = e.target.value
-                void api.updateCategory(category.id, { title: e.target.value }).then(refresh)
-              }}
-            />
-            <input
-              value={category.hint}
-              onChange={(e) => {
-                void api.updateCategory(category.id, { hint: e.target.value }).then(refresh)
-              }}
-            />
-            <select
-              value={category.parentId || ''}
-              onChange={(e) =>
-                void api.updateCategory(category.id, { parentId: e.target.value }).then(refresh)
-              }
-              aria-label="Родитель"
-            >
-              <option value="">Корневая</option>
-              {tree
-                .filter(({ category: item }) => !descendantIds(categories, category.id).includes(item.id))
-                .map(({ category: item, depth: itemDepth }) => (
-                  <option key={item.id} value={item.id}>
-                    {categoryOptionLabel(item.title, itemDepth)}
-                  </option>
-                ))}
-            </select>
-            <label className="admin-file">
-              Фото
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) void onUpload(file, category)
-                }}
-              />
-            </label>
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={() => {
-                setParentId(category.id)
-                setTitle('')
-                setHint('')
-                setImage(category.image || '/images/excavator.jpg')
-              }}
-            >
-              Подкатегория
-            </button>
-            <button
-              type="button"
-              className="btn btn-dark"
-              onClick={() => void remove(category)}
-            >
-              Удалить
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function BrandsAdmin() {
-  const { brands, refresh } = useSite()
-  const [name, setName] = useState('')
-
-  return (
-    <div className="admin-section">
-      <h1>Марки</h1>
-      <div className="admin-inline">
-        <input placeholder="Новая марка" value={name} onChange={(e) => setName(e.target.value)} />
-        <button
-          className="btn btn-primary"
-          type="button"
-          onClick={() =>
-            void api.createBrand(name).then(() => {
-              setName('')
-              return refresh()
-            })
-          }
-        >
-          Добавить
-        </button>
-      </div>
-      <div className="admin-list">
-        {brands.map((brand) => (
-          <div className="admin-card admin-row" key={brand.id}>
-            <input
-              value={brand.name}
-              onChange={(e) => void api.updateBrand(brand.id, e.target.value).then(refresh)}
-            />
-            <button
-              type="button"
-              className="btn btn-dark"
-              onClick={() => void api.deleteBrand(brand.id).then(refresh)}
-            >
-              Удалить
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function emptyMachine(brands: Brand[], categories: Category[]): Partial<Machine> {
-  return {
-    name: '',
-    brandId: brands[0]?.id,
-    categoryId: categories[0]?.id,
-    category: categories[0]?.title || '',
-    year: new Date().getFullYear(),
-    condition: 'Новый',
-    price: '',
-    priceFrom: 0,
-    images: [],
-    videoUrl: '',
-    description: '',
-    specs: [{ id: crypto.randomUUID(), label: '', value: '' }],
-    relatedIds: [],
-  }
-}
-
-function MachinesAdmin() {
-  const { machines, brands, categories, refresh } = useSite()
-  const [draft, setDraft] = useState<Partial<Machine>>(emptyMachine(brands, categories))
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [categoryTab, setCategoryTab] = useState('all')
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const editRef = useRef<HTMLDivElement>(null)
-
-  function startEdit(machine: Machine) {
-    setEditingId(machine.id)
-    setDraft({
-      ...machine,
-      specs: machine.specs.map((s) => ({ ...s })),
-      relatedIds: [...(machine.relatedIds || [])],
-      images: [...(machine.images || [])],
-    })
-  }
-
-  useEffect(() => {
-    if (!editingId) return
-    editRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [editingId])
-
-  function resetForm() {
-    setEditingId(null)
-    setDraft(emptyMachine(brands, categories))
-  }
-
-  async function save() {
-    setError('')
-    setMessage('')
-    try {
-      if (editingId) await api.updateMachine(editingId, draft)
-      else await api.createMachine(draft)
-      resetForm()
-      await refresh()
-      setMessage('Сохранено')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось сохранить')
-    }
-  }
-
-  async function uploadImage(file: File) {
-    setError('')
-    try {
-      const { url } = await api.upload(file)
-      setDraft((prev) => ({ ...prev, images: [...(prev.images || []), url] }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось загрузить фото')
-    }
-  }
-
-  function toggleRelated(id: string) {
-    setDraft((prev) => {
-      const current = prev.relatedIds || []
-      return {
-        ...prev,
-        relatedIds: current.includes(id)
-          ? current.filter((item) => item !== id)
-          : [...current, id],
-      }
-    })
-  }
-
-  const relatedCandidates = machines.filter((machine) => machine.id !== editingId)
-  const categoryTabs = flattenCategoryTree(categories)
-  const listMachines = machinesInCategory(machines, categoryTab, categories)
-  const categorySpecHints = useMemo(() => {
-    const labels = new Set<string>()
-    for (const machine of machines) {
-      if (machine.categoryId !== draft.categoryId) continue
-      for (const spec of machine.specs || []) {
-        if (spec.label.trim()) labels.add(spec.label.trim())
-      }
-    }
-    return [...labels].sort((a, b) => a.localeCompare(b, 'ru'))
-  }, [machines, draft.categoryId])
-
-  return (
-    <div className="admin-section">
-      <div className="admin-section-head">
-        <h1>Техника</h1>
-        {editingId && (
-          <button className="btn btn-dark" type="button" onClick={resetForm}>
-            Новая позиция
-          </button>
-        )}
-      </div>
-
-      <div className="admin-content-stack" ref={editRef}>
-        <ContentBlock
-          title={editingId ? 'Редактирование' : 'Новая позиция'}
-          description="Основные данные карточки техники."
-        >
-          <label>
-            Название
-            <input
-              value={draft.name || ''}
-              onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))}
-            />
-          </label>
-          <label>
-            Марка
-            <select
-              value={draft.brandId || ''}
-              onChange={(e) => setDraft((p) => ({ ...p, brandId: e.target.value }))}
-            >
-              {brands.map((brand) => (
-                <option key={brand.id} value={brand.id}>
-                  {brand.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Категория
-            <select
-              value={draft.categoryId || ''}
-              onChange={(e) => {
-                const category = categories.find((item) => item.id === e.target.value)
-                setDraft((p) => ({
-                  ...p,
-                  categoryId: e.target.value,
-                  category: category?.title || p.category,
-                }))
-              }}
-            >
-              {flattenCategoryTree(categories).map(({ category, depth }) => (
-                <option key={category.id} value={category.id}>
-                  {categoryOptionLabel(category.title, depth)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Тип (подпись)
-            <input
-              value={draft.category || ''}
-              onChange={(e) => setDraft((p) => ({ ...p, category: e.target.value }))}
-              placeholder="Экскаватор"
-            />
-          </label>
-          <label>
-            Год
-            <input
-              type="number"
-              value={draft.year || ''}
-              onChange={(e) => setDraft((p) => ({ ...p, year: Number(e.target.value) }))}
-            />
-          </label>
-          <label>
-            Состояние
-            <input
-              value={draft.condition || ''}
-              onChange={(e) => setDraft((p) => ({ ...p, condition: e.target.value }))}
-            />
-          </label>
-          <label>
-            Цена (текст)
-            <input
-              value={draft.price || ''}
-              onChange={(e) => {
-                const price = e.target.value
-                setDraft((p) => ({
-                  ...p,
-                  price,
-                  priceFrom: parsePriceAmount(price, 0) ?? 0,
-                }))
-              }}
-              placeholder="105 000 000"
-            />
-          </label>
-          <label>
-            Цена от (число)
-            <input
-              type="number"
-              value={draft.priceFrom || 0}
-              onChange={(e) => setDraft((p) => ({ ...p, priceFrom: Number(e.target.value) }))}
-            />
-          </label>
-          <label className="admin-span-2">
-            Описание
-            <textarea
-              rows={3}
-              value={draft.description || ''}
-              onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))}
-            />
-          </label>
-        </ContentBlock>
-
-        <ContentBlock title="Медиа" description="Фото для слайдера и необязательное видео.">
-          <label className="admin-span-2">
-            Видео URL
-            <input
-              value={draft.videoUrl || ''}
-              onChange={(e) => setDraft((p) => ({ ...p, videoUrl: e.target.value }))}
-              placeholder="YouTube или ссылка на файл"
-            />
-          </label>
-          <div className="admin-span-2 admin-media-block">
-            <div className="admin-thumbs">
-              {(draft.images || []).map((url) => (
-                <div key={url} className="admin-thumb-wrap">
-                  <img src={url} alt="" />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDraft((p) => ({
-                        ...p,
-                        images: (p.images || []).filter((item) => item !== url),
-                      }))
-                    }
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-            <label className="admin-file">
-              Загрузить фото
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || [])
-                  files.forEach((file) => void uploadImage(file))
-                  e.target.value = ''
-                }}
-              />
-            </label>
-          </div>
-        </ContentBlock>
-
-        <ContentBlock
-          title="Характеристики"
-          description="Эти поля попадают в карточку и в фильтр каталога."
-        >
-          <div className="admin-span-2 admin-specs-editor">
-            {(draft.specs || []).map((spec, index) => (
-              <div className="admin-spec-row" key={spec.id}>
-                <label>
-                  Название
-                  <input
-                    list="category-spec-hints"
-                    placeholder="Мощность"
-                    value={spec.label}
-                    onChange={(e) => {
-                      const specs = [...(draft.specs || [])] as Spec[]
-                      specs[index] = { ...specs[index], label: e.target.value }
-                      setDraft((p) => ({ ...p, specs }))
-                    }}
-                  />
-                </label>
-                <label>
-                  Значение
-                  <input
-                    placeholder="371 л.с."
-                    value={spec.value}
-                    onChange={(e) => {
-                      const specs = [...(draft.specs || [])] as Spec[]
-                      specs[index] = { ...specs[index], value: e.target.value }
-                      setDraft((p) => ({ ...p, specs }))
-                    }}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-dark"
-                  aria-label="Удалить характеристику"
-                  onClick={() =>
-                    setDraft((p) => ({
-                      ...p,
-                      specs: (p.specs || []).filter((_, i) => i !== index),
-                    }))
-                  }
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            <datalist id="category-spec-hints">
-              {categorySpecHints.map((label) => (
-                <option key={label} value={label} />
-              ))}
-            </datalist>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() =>
-                setDraft((p) => ({
-                  ...p,
-                  specs: [
-                    ...(p.specs || []),
-                    { id: crypto.randomUUID(), label: '', value: '' },
-                  ],
-                }))
-              }
-            >
-              Добавить характеристику
-            </button>
-          </div>
-        </ContentBlock>
-
-        <ContentBlock
-          title="Похожая техника"
-          description="Что показывать внизу страницы товара. Если ничего не выбрать — подставим автоматически из той же категории."
-        >
-          <div className="admin-span-2">
-            {relatedCandidates.length ? (
-              <ul className="admin-related-list">
-                {relatedCandidates.map((machine) => (
-                  <li key={machine.id}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={(draft.relatedIds || []).includes(machine.id)}
-                        onChange={() => toggleRelated(machine.id)}
-                      />
-                      <img src={machine.images?.[0]} alt="" />
-                      <span>
-                        <strong>{machine.name}</strong>
-                        <em>
-                          {machine.brand} · {machine.category}
-                        </em>
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="admin-tab-hint">Пока нет других позиций для выбора.</p>
-            )}
-          </div>
-        </ContentBlock>
-
-        <div className="admin-inline">
-          <button className="btn btn-primary" type="button" onClick={() => void save()}>
-            {editingId ? 'Сохранить изменения' : 'Добавить технику'}
-          </button>
-          {editingId && (
-            <button className="btn btn-dark" type="button" onClick={resetForm}>
-              Отмена
-            </button>
-          )}
-          {error ? <p className="admin-error">{error}</p> : null}
-          {message ? <p className="admin-ok">{message}</p> : null}
-        </div>
-      </div>
-
-      <div className="admin-list">
-        <h2>Все позиции</h2>
-        {categoryTabs.length > 0 && (
-          <div className="admin-tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={categoryTab === 'all'}
-              className={categoryTab === 'all' ? 'is-active' : undefined}
-              onClick={() => setCategoryTab('all')}
-            >
-              Все
-              <em>{machines.length}</em>
-            </button>
-            {categoryTabs.map(({ category, depth }) => (
-              <button
-                key={category.id}
-                type="button"
-                role="tab"
-                aria-selected={categoryTab === category.id}
-                className={categoryTab === category.id ? 'is-active' : undefined}
-                onClick={() => setCategoryTab(category.id)}
-              >
-                {depth ? `— ${category.title}` : category.title}
-                <em>{machinesInCategory(machines, category.id, categories).length}</em>
-              </button>
-            ))}
-          </div>
-        )}
-        {listMachines.map((machine) => (
-          <div className="admin-card admin-row" key={machine.id}>
-            <img src={machine.images?.[0]} alt="" className="admin-thumb" />
-            <div>
-              <strong>{machine.name}</strong>
-              <p>
-                {machine.brand} · {machine.category}
-                {(machine.relatedIds || []).length
-                  ? ` · похожих: ${machine.relatedIds?.length}`
-                  : ''}
-              </p>
-            </div>
-            <button type="button" className="btn btn-primary" onClick={() => startEdit(machine)}>
-              Изменить
-            </button>
-            <button
-              type="button"
-              className="btn btn-dark"
-              onClick={() => void api.deleteMachine(machine.id).then(refresh)}
-            >
-              Удалить
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function LeadsAdmin() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [tab, setTab] = useState<'new' | 'done' | 'deleted'>('new')
@@ -1550,6 +1024,22 @@ export function AdminApp() {
         }
       />
       <Route
+        path="categories/new"
+        element={
+          <Guard>
+            <CategoryEditor />
+          </Guard>
+        }
+      />
+      <Route
+        path="categories/:id"
+        element={
+          <Guard>
+            <CategoryEditor />
+          </Guard>
+        }
+      />
+      <Route
         path="brands"
         element={
           <Guard>
@@ -1558,10 +1048,42 @@ export function AdminApp() {
         }
       />
       <Route
+        path="brands/:id"
+        element={
+          <Guard>
+            <BrandEditor />
+          </Guard>
+        }
+      />
+      <Route
         path="machines"
         element={
           <Guard>
             <MachinesAdmin />
+          </Guard>
+        }
+      />
+      <Route
+        path="machines/new"
+        element={
+          <Guard>
+            <MachineEditor />
+          </Guard>
+        }
+      />
+      <Route
+        path="machines/:id"
+        element={
+          <Guard>
+            <MachineEditor />
+          </Guard>
+        }
+      />
+      <Route
+        path="stats"
+        element={
+          <Guard>
+            <StatsPage />
           </Guard>
         }
       />

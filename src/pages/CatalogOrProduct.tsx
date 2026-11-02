@@ -6,8 +6,10 @@ import {
   machinePath,
 } from '../categorySlug'
 import { Footer, Header } from '../components/Layout'
+import { CatalogSkeleton } from '../components/Skeleton'
 import { useSite } from '../context/SiteContext'
 import { NotFoundPage } from './NotFoundPage'
+import './CatalogPage.css'
 
 export function CatalogOrProduct() {
   const { id } = useParams()
@@ -16,10 +18,10 @@ export function CatalogOrProduct() {
 
   if (loading) {
     return (
-      <div className="page">
+      <div className="page catalog-page">
         <Header />
-        <main>
-          <p>Загрузка…</p>
+        <main className="catalog-main">
+          <CatalogSkeleton />
         </main>
         <Footer />
       </div>

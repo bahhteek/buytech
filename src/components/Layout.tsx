@@ -1,27 +1,113 @@
-import { Link, NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+import { getAdminToken } from '../api/client'
 import { DEFAULT_CONTACTS, telHref, waHref } from '../contactLinks'
+import { findMachineBySlugOrId } from '../categorySlug'
 import { useSite } from '../context/SiteContext'
+import { SiteSearch } from './SiteSearch'
 
 type HeaderProps = {
   variant?: 'home' | 'inner'
 }
 
-export function Header({ variant = 'inner' }: HeaderProps) {
+export function Logo({
+  tone = 'on-dark',
+  lockup = false,
+}: {
+  tone?: 'on-dark' | 'on-light'
+  lockup?: boolean
+}) {
+  const src = lockup
+    ? tone === 'on-light'
+      ? '/logo-lockup-ink.svg'
+      : '/logo-lockup.svg'
+    : tone === 'on-light'
+      ? '/logo-wordmark-ink.svg'
+      : '/logo-wordmark.svg'
+
+  return <img className="logo-mark" src={src} alt="" />
+}
+
+function AdminProductEdit() {
+  const location = useLocation()
+  const { allMachines } = useSite()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    setIsAdmin(Boolean(getAdminToken()))
+  }, [location.pathname])
+
+  const parts = location.pathname.split('/').filter(Boolean)
+  const machine =
+    isAdmin && parts.length === 2 && parts[0] !== 'admin' && parts[0] !== 'brand'
+      ? findMachineBySlugOrId(allMachines, parts[1])
+      : undefined
+  if (!machine) return null
+
   return (
-    <header className={`header${variant === 'inner' ? ' header-solid' : ''}`}>
-      <Link className="logo" to="/">
-        Buy<span>Tech</span>
-      </Link>
-      <nav className="nav" aria-label="Основная навигация">
-        <NavLink to="/catalog">Каталог</NavLink>
-        <a href="/#process">Поставка</a>
-        <NavLink to="/about">О компании</NavLink>
-        <NavLink to="/contacts">Контакты</NavLink>
-      </nav>
-      <Link className="header-cta" to="/contacts">
-        Заявка
-      </Link>
-    </header>
+    <Link className="header-edit" to={`/admin/machines/${machine.id}`}>
+      Редактировать
+    </Link>
+  )
+}
+
+export function Header({ variant = 'inner' }: HeaderProps) {
+  const [open, setOpen] = useState(false)
+  const location = useLocation()
+
+  useEffect(() => {
+    setOpen(false)
+  }, [location.pathname, location.hash])
+
+  return (
+    <>
+      {open ? (
+        <button
+          type="button"
+          className="mobile-nav-backdrop"
+          aria-label="Закрыть меню"
+          onClick={() => setOpen(false)}
+        />
+      ) : null}
+      <header className={`header${variant === 'inner' ? ' header-solid' : ''}${open ? ' is-menu-open' : ''}`}>
+        <div className="header-bar">
+          <Link className="logo" to="/" aria-label="buytechkz">
+            <Logo lockup />
+          </Link>
+          <nav className="nav" aria-label="Основная навигация">
+            <NavLink to="/catalog">Каталог</NavLink>
+            <Link to="/#process">Поставка</Link>
+            <NavLink to="/about">О компании</NavLink>
+            <NavLink to="/contacts">Контакты</NavLink>
+          </nav>
+          <SiteSearch />
+          <button
+            type="button"
+            className="menu-toggle"
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            aria-label={open ? 'Закрыть меню' : 'Открыть меню'}
+            onClick={() => setOpen((value) => !value)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+          <AdminProductEdit />
+          <Link className="header-cta" to="/contacts">
+            Заявка
+          </Link>
+        </div>
+        {open ? (
+          <nav id="mobile-nav" className="mobile-nav" aria-label="Мобильная навигация">
+            <NavLink to="/catalog">Каталог</NavLink>
+            <Link to="/#process">Поставка</Link>
+            <NavLink to="/about">О компании</NavLink>
+            <NavLink to="/contacts">Контакты</NavLink>
+          </nav>
+        ) : null}
+      </header>
+    </>
   )
 }
 
@@ -32,8 +118,8 @@ export function Footer() {
     <footer className="footer">
       <div className="footer-inner">
         <div className="footer-brand">
-          <Link className="logo" to="/">
-            Buy<span>Tech</span>
+          <Link className="logo" to="/" aria-label="buytechkz">
+            <Logo lockup />
           </Link>
           <p>
             {content.footer?.text ||

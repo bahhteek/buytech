@@ -1,4 +1,4 @@
-import type { Category, Machine } from './types'
+import type { Brand, Category, Machine } from './types'
 import { categoryPath } from './categoryTree'
 
 const TITLE_SLUGS: Record<string, string> = {
@@ -195,4 +195,37 @@ export function findMachineBySlugOrId(machines: Machine[], value: string) {
   if (byId) return byId
   const slugs = machineSlugMap(machines)
   return machines.find((machine) => slugs.get(machine.id) === value)
+}
+
+function preferredBrandSlug(brand: Brand) {
+  const explicit = brand.slug?.trim().toLowerCase()
+  if (explicit && isPrettySlug(explicit)) return explicit
+  return slugifyPath(brand.name)
+}
+
+export function brandSlugMap(brands: Brand[]) {
+  const used = new Set<string>()
+  const map = new Map<string, string>()
+  const ordered = [...brands].sort((a, b) => a.id.localeCompare(b.id))
+  for (const brand of ordered) {
+    let slug = preferredBrandSlug(brand)
+    if (!slug || used.has(slug)) {
+      slug = `${slug || 'brand'}-${brand.id.slice(0, 8).toLowerCase()}`
+    }
+    used.add(slug)
+    map.set(brand.id, slug)
+  }
+  return map
+}
+
+export function brandPath(brand: Brand, brands: Brand[]) {
+  return `/brand/${brandSlugMap(brands).get(brand.id) || slugifyPath(brand.name)}`
+}
+
+export function findBrandBySlugOrId(brands: Brand[], value: string) {
+  if (!value) return undefined
+  const byId = brands.find((brand) => brand.id === value)
+  if (byId) return byId
+  const slugs = brandSlugMap(brands)
+  return brands.find((brand) => slugs.get(brand.id) === value)
 }

@@ -43,6 +43,16 @@ function route($method, $path)
         output_sitemap();
     }
 
+    if ($method === 'POST' && $path === '/analytics/view') {
+        analytics_record_view(json_body());
+        json_response(array('ok' => true));
+    }
+
+    if ($method === 'POST' && $path === '/analytics/search') {
+        analytics_record_search(json_body());
+        json_response(array('ok' => true));
+    }
+
     if ($method === 'POST' && $path === '/leads') {
         $body = json_body();
         $name = isset($body['name']) ? trim((string) $body['name']) : '';
@@ -50,12 +60,22 @@ function route($method, $path)
         if ($name === '' || $phone === '') {
             json_response(array('error' => 'name and phone are required'), 400);
         }
+        $place = analytics_lead_place(analytics_request_is_staff($body));
         $lead = array(
             'id' => uuid(),
             'name' => $name,
             'phone' => $phone,
             'email' => isset($body['email']) ? trim((string) $body['email']) : '',
             'need' => isset($body['need']) ? trim((string) $body['need']) : '',
+            'page' => isset($body['page']) ? mb_substr(trim((string) $body['page']), 0, 300) : '',
+            'machineId' => isset($body['machineId']) ? mb_substr(trim((string) $body['machineId']), 0, 80) : '',
+            'visitor' => isset($body['visitor']) ? mb_substr(trim((string) $body['visitor']), 0, 80) : '',
+            'session' => isset($body['session']) ? mb_substr(trim((string) $body['session']), 0, 80) : '',
+            'source' => isset($body['source']) ? mb_substr(trim((string) $body['source']), 0, 32) : '',
+            'country' => $place['country'],
+            'city' => $place['city'],
+            'ipHash' => isset($place['ipHash']) ? $place['ipHash'] : '',
+            'excludeFromStats' => !empty($place['excludeFromStats']),
             'createdAt' => gmdate('c'),
             'status' => 'new',
         );
@@ -68,6 +88,11 @@ function route($method, $path)
             $mail = send_lead_email($lead);
         } catch (Throwable $error) {
             $mail = array('sent' => false, 'reason' => 'send_failed');
+        }
+        try {
+            send_lead_telegram($lead);
+        } catch (Throwable $error) {
+            /* заявка уже сохранена */
         }
         json_response(array('lead' => $lead, 'mail' => $mail), 201);
     }
@@ -100,6 +125,29 @@ function route($method, $path)
     if ($method === 'GET' && $path === '/admin/leads') {
         require_auth();
         json_response(read_db()['leads']);
+    }
+
+    if ($method === 'GET' && $path === '/admin/telegram') {
+        require_auth();
+        json_response(array('configured' => telegram_configured()));
+    }
+
+    if ($method === 'POST' && $path === '/admin/analytics/clear') {
+        require_auth();
+        $body = json_body();
+        analytics_clear(
+            isset($body['scope']) ? (string) $body['scope'] : '',
+            isset($body['range']) ? (string) $body['range'] : 'month',
+            isset($body['machineId']) ? (string) $body['machineId'] : ''
+        );
+        json_response(array('ok' => true));
+    }
+
+    if ($method === 'GET' && $path === '/admin/analytics') {
+        require_auth();
+        $range = isset($_GET['range']) ? (string) $_GET['range'] : 'month';
+        $machineId = isset($_GET['machine']) ? trim((string) $_GET['machine']) : '';
+        json_response(analytics_report($range, $machineId));
     }
 
     if (preg_match('#^/admin/leads/([^/]+)$#', $path, $match)) {
@@ -165,7 +213,14 @@ function route($method, $path)
         if ($name === '') {
             json_response(array('error' => 'name required'), 400);
         }
-        $brand = array('id' => uuid(), 'name' => $name);
+        $brand = array(
+            'id' => uuid(),
+            'name' => $name,
+            'bannerImage' => isset($body['bannerImage']) ? (string) $body['bannerImage'] : '',
+            'shortText' => isset($body['shortText']) ? (string) $body['shortText'] : '',
+            'article' => isset($body['article']) ? (string) $body['article'] : '',
+            'slug' => isset($body['slug']) ? strtolower(trim((string) $body['slug'])) : '',
+        );
         update_db(function ($db) use ($brand) {
             $db['brands'][] = $brand;
             return $db;
@@ -178,13 +233,20 @@ function route($method, $path)
         $id = $match[1];
         if ($method === 'PUT') {
             $body = json_body();
-            $name = isset($body['name']) ? trim((string) $body['name']) : '';
             $updated = null;
-            update_db(function ($db) use ($id, $name, &$updated) {
+            update_db(function ($db) use ($id, $body, &$updated) {
                 foreach ($db['brands'] as $index => $brand) {
                     if ((string) $brand['id'] === (string) $id) {
-                        if ($name !== '') {
-                            $db['brands'][$index]['name'] = $name;
+                        if (isset($body['name']) && trim((string) $body['name']) !== '') {
+                            $db['brands'][$index]['name'] = trim((string) $body['name']);
+                        }
+                        foreach (array('bannerImage', 'shortText', 'article') as $field) {
+                            if (array_key_exists($field, $body)) {
+                                $db['brands'][$index][$field] = (string) $body[$field];
+                            }
+                        }
+                        if (isset($body['slug'])) {
+                            $db['brands'][$index]['slug'] = strtolower(trim((string) $body['slug']));
                         }
                         $updated = $db['brands'][$index];
                         foreach ($db['machines'] as $mIndex => $machine) {
@@ -297,6 +359,7 @@ function route($method, $path)
         $images = (isset($body['images']) && is_array($body['images']) && count($body['images']))
             ? $body['images']
             : array('/images/excavator.jpg');
+        $videos = machine_videos_from($body);
         $machine = array(
             'id' => uuid(),
             'name' => (string) $body['name'],
@@ -312,7 +375,9 @@ function route($method, $path)
                 isset($body['priceFrom']) ? $body['priceFrom'] : 0
             ),
             'images' => $images,
-            'videoUrl' => isset($body['videoUrl']) ? (string) $body['videoUrl'] : '',
+            'videos' => $videos,
+            'videoUrl' => isset($videos[0]) ? $videos[0] : '',
+            'draft' => !empty($body['draft']),
             'description' => isset($body['description']) ? (string) $body['description'] : '',
             'specs' => normalize_specs(isset($body['specs']) ? $body['specs'] : array()),
             'relatedIds' => normalize_related_ids(isset($body['relatedIds']) ? $body['relatedIds'] : array()),
@@ -371,6 +436,14 @@ function route($method, $path)
                     $updated['relatedIds'] = isset($body['relatedIds']) && is_array($body['relatedIds'])
                         ? normalize_related_ids($body['relatedIds'], $current['id'])
                         : (isset($current['relatedIds']) ? $current['relatedIds'] : array());
+                    if (isset($body['videos']) || isset($body['videoUrl'])) {
+                        $videos = machine_videos_from($body, $current);
+                        $updated['videos'] = $videos;
+                        $updated['videoUrl'] = isset($videos[0]) ? $videos[0] : '';
+                    }
+                    if (array_key_exists('draft', $body)) {
+                        $updated['draft'] = !empty($body['draft']);
+                    }
                     $db['machines'][$index] = $updated;
                     break;
                 }

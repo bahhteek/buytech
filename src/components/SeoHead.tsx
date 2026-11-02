@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
+  brandPath,
   catalogCategoryPath,
+  findBrandBySlugOrId,
   findCategoryBySlugOrId,
   findMachineBySlugOrId,
   machinePath,
@@ -30,7 +32,7 @@ function setCanonical(href: string) {
 
 export function SeoHead() {
   const location = useLocation()
-  const { content, categories, machines, loading } = useSite()
+  const { content, categories, machines, allMachines, brands, loading } = useSite()
 
   useEffect(() => {
     const parts = location.pathname.split('/').filter(Boolean)
@@ -40,7 +42,11 @@ export function SeoHead() {
     const pathname = location.pathname
     const canonical = origin + (pathname === '/' ? '/' : pathname)
     const category = parts[0] ? findCategoryBySlugOrId(categories, parts[0]) : undefined
-    const machine = parts[1] ? findMachineBySlugOrId(machines, parts[1]) : undefined
+    const machine =
+      parts[0] === 'brand' ? undefined : parts[1] ? findMachineBySlugOrId(allMachines, parts[1]) : undefined
+    const brand = parts[0] === 'brand' && parts[1] ? findBrandBySlugOrId(brands, parts[1]) : undefined
+
+    setMeta('robots', pathname.startsWith('/admin') ? 'noindex, nofollow, noarchive' : 'index, follow')
 
     let title = 'Страница не найдена | BuyTech'
     let description = 'Такой страницы нет на BuyTech.'
@@ -59,13 +65,20 @@ export function SeoHead() {
       description =
         content.catalog?.lead ||
         'Каталог новой спецтехники из Китая: самосвалы, экскаваторы, бульдозеры и погрузчики с поставкой в Казахстан.'
+    } else if (brand) {
+      title = `${brand.name} — спецтехника из Китая | BuyTech`
+      description =
+        brand.shortText ||
+        `Новая техника ${brand.name} с завода в Китае: модели, поставка и документы для Казахстана.`
+      href = origin + brandPath(brand, brands)
     } else if (machine) {
       const heading = [machine.brand, machine.name].filter(Boolean).join(' ')
       title = `${heading} — купить в Казахстане | BuyTech`
       description =
         machine.description ||
         `${machine.brand} ${machine.category}: новая техника из Китая, документы и доставка.`.trim()
-      href = origin + machinePath(machine, categories, machines)
+      href = origin + machinePath(machine, categories, allMachines)
+      setMeta('robots', machine.draft ? 'noindex, nofollow' : 'index, follow')
     } else if (category && parts.length === 1) {
       title = `${category.title} — купить в Казахстане | BuyTech`
       description = `Купить ${category.title.toLowerCase()} из Китая в Казахстан: новые машины, документы и доставка на объект.`
@@ -90,7 +103,7 @@ export function SeoHead() {
     document.title = title
     setMeta('description', description)
     setCanonical(href)
-  }, [location.pathname, content, categories, machines, loading])
+  }, [location.pathname, content, categories, machines, allMachines, brands, loading])
 
   return null
 }

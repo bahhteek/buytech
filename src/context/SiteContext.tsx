@@ -18,6 +18,7 @@ type SiteContextValue = {
   brands: Brand[]
   categories: Category[]
   machines: Machine[]
+  allMachines: Machine[]
   refresh: () => Promise<void>
   getMachineById: (id: string) => Machine | undefined
   getRelatedMachines: (machine: Machine, limit?: number) => Machine[]
@@ -69,10 +70,17 @@ export function SiteProvider({ children }: { children: ReactNode }) {
   }, [loading, data.machines.length])
 
   const value = useMemo<SiteContextValue>(() => {
-    const machines = data.machines.map((machine) => ({
+    const allMachines: Machine[] = data.machines.map((machine) => ({
       ...machine,
       images: machine.images?.length ? machine.images : [machineCover(machine)],
+      videos: machine.videos?.length
+        ? machine.videos
+        : machine.videoUrl
+          ? [machine.videoUrl]
+          : [],
+      draft: Boolean(machine.draft),
     }))
+    const machines = allMachines.filter((machine) => !machine.draft)
 
     return {
       loading,
@@ -85,8 +93,9 @@ export function SiteProvider({ children }: { children: ReactNode }) {
       brands: data.brands,
       categories: data.categories,
       machines,
+      allMachines,
       refresh,
-      getMachineById: (id: string) => machines.find((item) => item.id === id),
+      getMachineById: (id: string) => allMachines.find((item) => item.id === id),
       getRelatedMachines: (machine: Machine, limit = 3) => {
         const exclude = new Set([machine.id])
         const pick = (list: Machine[]) =>
@@ -95,7 +104,7 @@ export function SiteProvider({ children }: { children: ReactNode }) {
         const manual = (machine.relatedIds || [])
           .map((id) => machines.find((item) => item.id === id))
           .filter((item): item is Machine => Boolean(item))
-        if (manual.length) return manual.slice(0, limit)
+        if (manual.length) return manual
 
         const sameCategory = pick(
           machines.filter((item) => item.categoryId === machine.categoryId),

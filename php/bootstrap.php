@@ -220,4 +220,6 @@ require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/slugs.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/mail.php';
+require_once __DIR__ . '/telegram.php';
+require_once __DIR__ . '/analytics.php';
 require_once __DIR__ . '/sitemap.php';

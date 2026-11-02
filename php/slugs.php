@@ -187,6 +187,51 @@ function category_root($category, $categories)
     return $current;
 }
 
+function brand_slug_map($brands)
+{
+    $used = array();
+    $map = array();
+    usort($brands, function ($a, $b) {
+        $left = isset($a['id']) ? (string) $a['id'] : '';
+        $right = isset($b['id']) ? (string) $b['id'] : '';
+        return strcmp($left, $right);
+    });
+    foreach ($brands as $brand) {
+        if (empty($brand['id']) || empty($brand['name'])) {
+            continue;
+        }
+        $id = (string) $brand['id'];
+        $explicit = isset($brand['slug']) ? strtolower(trim((string) $brand['slug'])) : '';
+        $slug = ($explicit !== '' && slug_is_pretty($explicit)) ? $explicit : slugify_path((string) $brand['name']);
+        if ($slug === '' || isset($used[$slug])) {
+            $slug = ($slug !== '' ? $slug : 'brand') . '-' . strtolower(substr($id, 0, 8));
+        }
+        $used[$slug] = true;
+        $map[$id] = $slug;
+    }
+    return $map;
+}
+
+function find_brand_by_slug_or_id($brands, $value)
+{
+    $value = rawurldecode((string) $value);
+    if ($value === '') {
+        return null;
+    }
+    foreach ($brands as $brand) {
+        if (isset($brand['id']) && (string) $brand['id'] === $value) {
+            return $brand;
+        }
+    }
+    $map = brand_slug_map($brands);
+    foreach ($brands as $brand) {
+        if (!empty($brand['id']) && isset($map[$brand['id']]) && $map[$brand['id']] === $value) {
+            return $brand;
+        }
+    }
+    return null;
+}
+
 function machine_preferred_slug($machine)
 {
     $explicit = isset($machine['slug']) ? strtolower(trim((string) $machine['slug'])) : '';

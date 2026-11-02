@@ -1,8 +1,10 @@
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
-import { Fragment } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { Footer, Header } from '../components/Layout'
+import { ProductSkeleton } from '../components/Skeleton'
 import { MachineCard } from '../components/MachineCard'
 import { ImageSlider, VideoEmbed } from '../components/Media'
+import { QuoteModal } from '../components/QuoteModal'
 import { useSite } from '../context/SiteContext'
 import {
   catalogCategoryPath,
@@ -10,26 +12,130 @@ import {
   findMachineBySlugOrId,
   machinePath,
 } from '../categorySlug'
+import { machineVideos, type Machine } from '../types'
 import { categoryPath } from '../categoryTree'
 import './ProductPage.css'
+
+function RelatedSlider({ machines }: { machines: Machine[] }) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const drag = useRef({ x: 0, left: 0, moved: false, active: false })
+  const [canPrev, setCanPrev] = useState(false)
+  const [canNext, setCanNext] = useState(false)
+  const [dragging, setDragging] = useState(false)
+
+  function sync() {
+    const track = trackRef.current
+    if (!track) return
+    setCanPrev(track.scrollLeft > 8)
+    setCanNext(track.scrollLeft + track.clientWidth < track.scrollWidth - 8)
+  }
+
+  useLayoutEffect(() => {
+    sync()
+    const track = trackRef.current
+    if (!track) return
+    track.addEventListener('scroll', sync, { passive: true })
+    window.addEventListener('resize', sync)
+    return () => {
+      track.removeEventListener('scroll', sync)
+      window.removeEventListener('resize', sync)
+    }
+  }, [machines])
+
+  function move(direction: number) {
+    const track = trackRef.current
+    if (!track) return
+    const card = track.querySelector('article')
+    const width = card ? card.getBoundingClientRect().width + 16 : track.clientWidth * 0.8
+    track.scrollBy({ left: direction * width, behavior: 'smooth' })
+  }
+
+  function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    const track = trackRef.current
+    if (!track || track.scrollWidth <= track.clientWidth + 8) return
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    drag.current = { x: event.clientX, left: track.scrollLeft, moved: false, active: true }
+  }
+
+  function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const track = trackRef.current
+    if (!track || !drag.current.active) return
+    const dx = event.clientX - drag.current.x
+    if (!drag.current.moved && Math.abs(dx) < 6) return
+    if (!drag.current.moved) {
+      drag.current.moved = true
+      setDragging(true)
+      track.setPointerCapture(event.pointerId)
+    }
+    track.scrollLeft = drag.current.left - dx
+  }
+
+  function onPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    const track = trackRef.current
+    drag.current.active = false
+    setDragging(false)
+    if (track?.hasPointerCapture(event.pointerId)) track.releasePointerCapture(event.pointerId)
+    window.setTimeout(() => {
+      drag.current.moved = false
+    }, 0)
+  }
+
+  function onClickCapture(event: ReactMouseEvent) {
+    if (!drag.current.moved) return
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  const slidable = canPrev || canNext
+
+  return (
+    <div className={`related-slider${slidable ? '' : ' is-static'}`}>
+      {slidable ? (
+        <button type="button" aria-label="Предыдущая техника" disabled={!canPrev} onClick={() => move(-1)}>
+          ‹
+        </button>
+      ) : null}
+      <div
+        className={`related-slider-track${dragging ? ' is-dragging' : ''}`}
+        ref={trackRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onClickCapture={onClickCapture}
+        onDragStart={(event) => event.preventDefault()}
+      >
+        {machines.map((item) => (
+          <MachineCard key={item.id} machine={item} />
+        ))}
+      </div>
+      {slidable ? (
+        <button type="button" aria-label="Следующая техника" disabled={!canNext} onClick={() => move(1)}>
+          ›
+        </button>
+      ) : null}
+    </div>
+  )
+}
 
 export function ProductPage() {
   const { id, productSlug } = useParams()
   const location = useLocation()
-  const { getMachineById, getRelatedMachines, categories, machines, loading } = useSite()
+  const { getMachineById, getRelatedMachines, categories, allMachines, loading } = useSite()
+  const [quoteOpen, setQuoteOpen] = useState(false)
   const machine = productSlug
-    ? findMachineBySlugOrId(machines, productSlug)
+    ? findMachineBySlugOrId(allMachines, productSlug)
     : id
       ? getMachineById(id)
       : undefined
-  const prettyPath = machine ? machinePath(machine, categories, machines) : ''
+  const prettyPath = machine ? machinePath(machine, categories, allMachines) : ''
 
   if (loading) {
     return (
       <div className="page product-page">
         <Header />
         <main className="product-main">
-          <p>Загрузка…</p>
+          <ProductSkeleton />
         </main>
         <Footer />
       </div>
@@ -58,8 +164,9 @@ export function ProductPage() {
     )
   }
 
-  const related = getRelatedMachines(machine)
+  const related = getRelatedMachines(machine, (machine.relatedIds || []).length ? 12 : 3)
   const requestLink = `/contacts?need=${encodeURIComponent(machine.name)}`
+  const videos = machineVideos(machine)
   const crumbs = categoryPath(categories, machine.categoryId)
   const fallbackCategory = findCategoryBySlugOrId(categories, machine.categoryId)
 
@@ -125,22 +232,15 @@ export function ProductPage() {
             </dl>
 
             <div className="product-actions">
-              <Link className="btn btn-primary" to={requestLink}>
-                Запросить цену
-              </Link>
+              <button className="btn btn-primary" type="button" onClick={() => setQuoteOpen(true)}>
+                Запросить КП
+              </button>
               <a className="btn btn-dark" href="tel:+77001234567">
                 Позвонить
               </a>
             </div>
           </div>
         </section>
-
-        {machine.videoUrl ? (
-          <section className="product-specs">
-            <h2>Видео</h2>
-            <VideoEmbed url={machine.videoUrl} />
-          </section>
-        ) : null}
 
         <section className="product-specs">
           <h2>Характеристики</h2>
@@ -153,6 +253,17 @@ export function ProductPage() {
             ))}
           </dl>
         </section>
+
+        {videos.length > 0 ? (
+          <section className="product-specs">
+            <h2>Видео</h2>
+            <div className="product-videos">
+              {videos.map((url) => (
+                <VideoEmbed key={url} url={url} />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="product-note">
           <h2>Поставка и документы</h2>
@@ -175,15 +286,12 @@ export function ProductPage() {
                   : `Другие позиции из категории «${machine.category}».`}
               </p>
             </div>
-            <div className="machine-grid">
-              {related.map((item) => (
-                <MachineCard key={item.id} machine={item} />
-              ))}
-            </div>
+            <RelatedSlider machines={related} />
           </section>
         )}
       </main>
 
+      {quoteOpen ? <QuoteModal machine={machine} onClose={() => setQuoteOpen(false)} /> : null}
       <Footer />
     </div>
   )

@@ -56,6 +56,21 @@ function auth(req, res, next) {
   next()
 }
 
+async function sendLeadTelegram(lead) {
+  const token = process.env.TELEGRAM_BOT_TOKEN || ''
+  const chat = process.env.TELEGRAM_CHAT_ID || ''
+  if (!token || !chat) return { sent: false, reason: 'not_configured' }
+  const page = lead.page ? `\nСтраница: ${lead.page}` : ''
+  const text = `Новая заявка BuyTech\nИмя: ${lead.name}\nТелефон: ${lead.phone}\nEmail: ${lead.email || '—'}\nЗапрос: ${lead.need || '—'}${page}`
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chat, text, disable_web_page_preview: true }),
+  })
+  if (!response.ok) return { sent: false, reason: 'send_failed' }
+  return { sent: true }
+}
+
 async function sendLeadEmail(lead) {
   const to = process.env.LEADS_EMAIL || process.env.SMTP_USER
   if (!process.env.SMTP_HOST || !to) {
@@ -131,6 +146,11 @@ app.post('/api/leads', async (req, res) => {
     phone: String(phone).trim(),
     email: String(email).trim(),
     need: String(need).trim(),
+    page: String(req.body?.page || '').slice(0, 300),
+    machineId: String(req.body?.machineId || '').slice(0, 80),
+    visitor: String(req.body?.visitor || '').slice(0, 80),
+    session: String(req.body?.session || '').slice(0, 80),
+    source: String(req.body?.source || '').slice(0, 32),
     createdAt: new Date().toISOString(),
     status: 'new',
   }
@@ -146,6 +166,11 @@ app.post('/api/leads', async (req, res) => {
   } catch (error) {
     console.error('[mail] failed', error)
     mail = { sent: false, reason: 'send_failed' }
+  }
+  try {
+    await sendLeadTelegram(lead)
+  } catch (error) {
+    console.error('[telegram] failed', error)
   }
 
   res.status(201).json({ lead, mail })
@@ -214,7 +239,14 @@ app.get('/api/admin/brands', auth, (_req, res) => {
 app.post('/api/admin/brands', auth, (req, res) => {
   const name = String(req.body?.name || '').trim()
   if (!name) return res.status(400).json({ error: 'name required' })
-  const brand = { id: randomUUID(), name }
+  const brand = {
+    id: randomUUID(),
+    name,
+    bannerImage: String(req.body?.bannerImage || ''),
+    shortText: String(req.body?.shortText || ''),
+    article: String(req.body?.article || ''),
+    slug: String(req.body?.slug || '').trim().toLowerCase(),
+  }
   updateDb((db) => {
     db.brands.push(brand)
     return db
@@ -228,7 +260,11 @@ app.put('/api/admin/brands/:id', auth, (req, res) => {
   updateDb((db) => {
     const brand = db.brands.find((item) => item.id === req.params.id)
     if (!brand) return db
-    brand.name = name || brand.name
+    if (name) brand.name = name
+    if (req.body?.bannerImage != null) brand.bannerImage = String(req.body.bannerImage)
+    if (req.body?.shortText != null) brand.shortText = String(req.body.shortText)
+    if (req.body?.article != null) brand.article = String(req.body.article)
+    if (req.body?.slug != null) brand.slug = String(req.body.slug).trim().toLowerCase()
     updated = brand
     db.machines = db.machines.map((machine) =>
       machine.brandId === brand.id ? { ...machine, brand: brand.name } : machine,
@@ -319,7 +355,13 @@ app.post('/api/admin/machines', auth, (req, res) => {
     price: String(body.price || ''),
     priceFrom: parsePriceAmount(body.price, body.priceFrom),
     images: Array.isArray(body.images) && body.images.length ? body.images : ['/images/excavator.jpg'],
-    videoUrl: String(body.videoUrl || ''),
+    videos: Array.isArray(body.videos)
+      ? body.videos.map((item) => String(item).trim()).filter(Boolean)
+      : String(body.videoUrl || '').trim()
+        ? [String(body.videoUrl).trim()]
+        : [],
+    videoUrl: Array.isArray(body.videos) && body.videos[0] ? String(body.videos[0]) : String(body.videoUrl || ''),
+    draft: Boolean(body.draft),
     description: String(body.description || ''),
     specs: Array.isArray(body.specs)
       ? body.specs.map((spec) => ({

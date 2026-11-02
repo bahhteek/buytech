@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
+import { leadMeta } from '../analytics'
 import { api } from '../api/client'
 import { Footer, Header } from '../components/Layout'
 import { DEFAULT_CONTACTS, telHref, waHref } from '../contactLinks'
@@ -9,9 +10,11 @@ import './ContactsPage.css'
 export function ContactsPage() {
   const { content } = useSite()
   const contacts = content.contacts || {}
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const needFromQuery = searchParams.get('need') ?? ''
   const [sent, setSent] = useState(false)
+  const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     name: '',
@@ -101,13 +104,16 @@ export function ContactsPage() {
                 className="contact-form"
                 onSubmit={(event) => {
                   event.preventDefault()
+                  if (sending) return
                   setError('')
+                  setSending(true)
                   void api
-                    .createLead(form)
+                    .createLead({ ...form, ...leadMeta({ page: `${location.pathname}${location.search}` }) })
                     .then(() => setSent(true))
                     .catch((err) =>
                       setError(err instanceof Error ? err.message : 'Не удалось отправить'),
                     )
+                    .finally(() => setSending(false))
                 }}
               >
                 <label>
@@ -153,8 +159,9 @@ export function ContactsPage() {
                   />
                 </label>
                 {error && <p className="admin-error">{error}</p>}
-                <button className="btn btn-primary" type="submit">
-                  Отправить заявку
+                <button className={`btn btn-primary${sending ? ' is-busy' : ''}`} type="submit" disabled={sending} aria-busy={sending}>
+                  {sending ? <span className="btn-spinner" aria-hidden="true" /> : null}
+                  {sending ? 'Отправляем…' : 'Отправить заявку'}
                 </button>
               </form>
             )}

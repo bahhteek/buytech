@@ -1,0 +1,140 @@
+.brand-main {
+  width: min(100% - 2 * var(--space), var(--max));
+  margin: 0 auto;
+  padding: 5.5rem 0 3rem;
+}
+
+.brand-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.brand-breadcrumbs a:hover {
+  color: var(--black);
+}
+
+.brand-banner {
+  position: relative;
+  display: grid;
+  min-height: 18rem;
+  overflow: hidden;
+  border: 1px solid #b7b7b0;
+  border-radius: 18px;
+  background: var(--black);
+  color: var(--white);
+}
+
+.brand-banner img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.brand-banner.has-photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(8, 8, 8, 0.82), rgba(8, 8, 8, 0.28));
+}
+
+.brand-banner-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  max-width: 38rem;
+  padding: clamp(1.4rem, 4vw, 2.4rem);
+}
+
+.brand-banner-copy p:first-child {
+  margin: 0;
+  font-family: var(--font-category);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.brand-banner-copy p:first-child::before {
+  content: '';
+  display: block;
+  width: 1.45rem;
+  height: 3px;
+  margin-bottom: 0.65rem;
+  background: var(--yellow);
+}
+
+.brand-banner-copy h1 {
+  margin: 0;
+  font-family: var(--font-category);
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.brand-short {
+  margin: 0;
+  max-width: 36rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.brand-article {
+  margin-top: 1.25rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  background: var(--white);
+  border: 1px solid #b7b7b0;
+  border-radius: 18px;
+}
+
+.brand-article > *:first-child {
+  margin-top: 0;
+}
+
+.brand-article h2,
+.brand-article h3 {
+  margin: 1.4rem 0 0.55rem;
+  font-family: var(--font-category);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.brand-article h2 {
+  font-size: 1.45rem;
+}
+
+.brand-article p,
+.brand-article li {
+  color: #3c3c38;
+  line-height: 1.6;
+}
+
+.brand-article img {
+  display: block;
+  width: min(100%, 46rem);
+  height: auto;
+  margin: 1rem 0;
+  border-radius: 12px;
+}
+
+.brand-article blockquote {
+  margin: 1rem 0;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--yellow);
+  color: var(--muted);
+}
+
+.brand-article a {
+  color: var(--black);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}

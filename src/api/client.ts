@@ -1,4 +1,4 @@
-import type { Lead, PublicPayload, SiteContent, Brand, Category, Machine } from '../types'
+import type { AnalyticsRange, AnalyticsReport, Lead, PublicPayload, SiteContent, Brand, Category, Machine } from '../types'
 
 const TOKEN_KEY = 'buytech_admin_token'
 
@@ -57,11 +57,34 @@ async function request<T>(path: string, options: RequestInit = {}, auth = false)
 
 export const api = {
   getPublic: () => request<PublicPayload>('/public'),
-  createLead: (payload: { name: string; phone: string; email?: string; need?: string }) =>
+  createLead: (payload: {
+    name: string
+    phone: string
+    email?: string
+    need?: string
+    page?: string
+    machineId?: string
+    visitor?: string
+    session?: string
+    source?: string
+    staff?: boolean
+  }) =>
     request<{ lead: Lead }>('/leads', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  getAnalytics: (range: AnalyticsRange = 'month', machine = '') =>
+    request<AnalyticsReport>(
+      `/admin/analytics?range=${range}${machine ? `&machine=${encodeURIComponent(machine)}` : ''}`,
+      {},
+      true,
+    ),
+  clearAnalytics: (payload: { scope: 'all' | 'period' | 'machine'; range: AnalyticsRange; machineId?: string }) =>
+    request<{ ok: boolean }>(
+      '/admin/analytics/clear',
+      { method: 'POST', body: JSON.stringify(payload) },
+      true,
+    ),
   login: (username: string, password: string) =>
     request<{ token: string }>('/admin/login', {
       method: 'POST',
@@ -82,15 +105,15 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(content),
     }, true),
-  createBrand: (name: string) =>
+  createBrand: (payload: Partial<Brand> | string) =>
     request<Brand>('/admin/brands', {
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(typeof payload === 'string' ? { name: payload } : payload),
     }, true),
-  updateBrand: (id: string, name: string) =>
+  updateBrand: (id: string, payload: Partial<Brand> | string) =>
     request<Brand>(`/admin/brands/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(typeof payload === 'string' ? { name: payload } : payload),
     }, true),
   deleteBrand: (id: string) =>
     request(`/admin/brands/${id}`, { method: 'DELETE' }, true),

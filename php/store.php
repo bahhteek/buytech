@@ -132,6 +132,43 @@ function parse_price_amount($price, $priceFrom = 0)
     return $priceFrom > 0 ? $priceFrom : 0;
 }
 
+function machine_is_public($machine)
+{
+    return empty($machine['draft']);
+}
+
+function normalize_url_list($value)
+{
+    if (!is_array($value)) {
+        return array();
+    }
+    $next = array();
+    foreach ($value as $item) {
+        $url = trim((string) $item);
+        if ($url !== '') {
+            $next[] = $url;
+        }
+    }
+    return array_values($next);
+}
+
+function machine_videos_from($body, $current = null)
+{
+    if (isset($body['videos']) && is_array($body['videos'])) {
+        return normalize_url_list($body['videos']);
+    }
+    if (isset($body['videoUrl']) && trim((string) $body['videoUrl']) !== '') {
+        return array(trim((string) $body['videoUrl']));
+    }
+    if (is_array($current) && isset($current['videos']) && is_array($current['videos'])) {
+        return normalize_url_list($current['videos']);
+    }
+    if (is_array($current) && !empty($current['videoUrl'])) {
+        return array(trim((string) $current['videoUrl']));
+    }
+    return array();
+}
+
 function machines_with_parsed_price($machines)
 {
     if (!is_array($machines)) {

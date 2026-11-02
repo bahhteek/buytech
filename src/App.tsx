@@ -1,4 +1,5 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { useLayoutEffect } from 'react'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { SiteProvider } from './context/SiteContext'
 import { HomePage } from './pages/HomePage'
 import { SeoHead } from './components/SeoHead'
@@ -8,16 +9,31 @@ import { ContactsPage } from './pages/ContactsPage'
 import { ProductPage } from './pages/ProductPage'
 import { AboutPage } from './pages/AboutPage'
 import { PrivacyPage, TermsPage } from './pages/LegalPages'
+import { BrandPage } from './pages/BrandPage'
 import { FaqPage } from './pages/FaqPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { AdminApp } from './admin/AdminApp'
+import { AnalyticsTracker } from './components/AnalyticsTracker'
 import './App.css'
+
+function ScrollOnNavigate() {
+  const { pathname, hash } = useLocation()
+
+  useLayoutEffect(() => {
+    if (hash || document.querySelector('.catalog-page')) return
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [pathname, hash])
+
+  return null
+}
 
 export default function App() {
   return (
     <SiteProvider>
       <BrowserRouter>
         <SeoHead />
+        <AnalyticsTracker />
+        <ScrollOnNavigate />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/catalog" element={<CatalogPage />} />
@@ -27,6 +43,7 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/faq" element={<FaqPage />} />
+          <Route path="/brand/:brandSlug" element={<BrandPage />} />
           <Route path="/admin/*" element={<AdminApp />} />
           <Route path="/:categorySlug/:productSlug" element={<ProductPage />} />
           <Route path="/:categorySlug" element={<CatalogPage />} />

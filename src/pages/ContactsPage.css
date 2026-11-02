@@ -1,8 +1,3 @@
-.contacts-page .header-solid {
-  position: sticky;
-  background: var(--black);
-}
-
 .contacts-main {
   width: min(100% - 2 * var(--space), var(--max));
   margin: 0 auto;
@@ -15,31 +10,31 @@
 }
 
 .contacts-kicker {
-  margin: 0 0 0.45rem;
-  color: var(--black);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-family: var(--font-category);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .contacts-kicker::before {
   content: '';
-  display: inline-block;
-  width: 28px;
-  height: 6px;
-  margin-right: 0.55rem;
-  vertical-align: middle;
+  display: block;
+  width: 1.45rem;
+  height: 3px;
+  margin-bottom: 0.65rem;
   background: var(--yellow);
 }
 
 .contacts-top h1 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.8rem, 3.4vw, 2.6rem);
-  letter-spacing: -0.035em;
-  text-transform: uppercase;
-  line-height: 1.1;
+  font-family: var(--font-category);
+  font-size: clamp(1.9rem, 3.2vw, 2.55rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.12;
 }
 
 .contacts-top p:last-child {
@@ -49,27 +44,34 @@
 
 .contacts-layout {
   display: grid;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .contacts-info,
 .contacts-form-panel {
-  padding: clamp(1.25rem, 3vw, 1.75rem);
+  padding: clamp(1.25rem, 3vw, 1.6rem);
   background: var(--white);
-  border: 2px solid var(--black);
+  border: 1px solid #b7b7b0;
+  border-radius: 18px;
 }
 
-.contacts-info {
-  box-shadow: 8px 8px 0 var(--yellow);
+.contacts-info h2::before,
+.contacts-form-panel h2::before {
+  content: '';
+  display: block;
+  width: 1.45rem;
+  height: 3px;
+  margin-bottom: 0.75rem;
+  background: var(--yellow);
 }
 
 .contacts-info h2,
 .contacts-form-panel h2 {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-category);
   font-size: 1.35rem;
+  font-weight: 700;
   letter-spacing: -0.03em;
-  text-transform: uppercase;
 }
 
 .contacts-lead {
@@ -88,28 +90,29 @@
 
 .contacts-list li {
   display: grid;
-  gap: 0.25rem;
-  padding-top: 0.85rem;
-  border-top: 2px solid var(--black);
+  gap: 0.2rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid #eceae4;
 }
 
 .contacts-list span {
+  font-family: var(--font-category);
   font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .contacts-list a,
 .contacts-list strong {
-  font-size: 1.05rem;
-  font-weight: 800;
+  font-family: var(--font-category);
+  font-size: 1.02rem;
+  font-weight: 700;
   color: var(--black);
 }
 
 .contacts-list a {
-  border-bottom: 3px solid var(--yellow);
   width: fit-content;
 }
 
@@ -125,18 +128,18 @@
 .contacts-form-panel .contact-form textarea {
   width: 100%;
   min-height: 7rem;
-  padding: 0.75rem 0.9rem;
-  border: 2px solid var(--black);
-  border-radius: var(--radius);
-  background: var(--off-white);
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #b7b7b0;
+  border-radius: 10px;
+  background: var(--white);
   color: var(--black);
   resize: vertical;
   font: inherit;
 }
 
 .contacts-form-panel .contact-form textarea:focus {
-  outline: 3px solid rgba(255, 212, 0, 0.55);
-  background: var(--white);
+  outline: 3px solid rgba(255, 212, 0, 0.45);
+  border-color: var(--black);
 }
 
 .contacts-form-panel .contact-form .btn {
@@ -148,15 +151,16 @@
   display: grid;
   gap: 0.65rem;
   justify-items: start;
-  padding: 1.25rem;
-  border: 2px solid var(--black);
-  background: rgba(255, 212, 0, 0.18);
+  padding: 1.15rem 1.2rem;
+  border: 1px solid #b7b7b0;
+  border-radius: 12px;
+  background: #f7f6f1;
 }
 
 .contacts-success h3 {
   margin: 0;
-  font-family: var(--font-display);
-  text-transform: uppercase;
+  font-family: var(--font-category);
+  font-weight: 700;
   letter-spacing: -0.03em;
 }
 

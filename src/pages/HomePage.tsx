@@ -1,24 +1,40 @@
-import { Link } from 'react-router-dom'
-import { Footer, Header } from '../components/Layout'
+import { useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { HomeIntro } from '../components/HomeIntro'
+import { Footer, Header, Logo } from '../components/Layout'
 import { MachineCard } from '../components/MachineCard'
+import { BrandSkeletons, CategoryGridSkeleton, MachineGridSkeleton } from '../components/Skeleton'
 import { useSite } from '../context/SiteContext'
-import { catalogCategoryPath } from '../categorySlug'
+import { brandPath, catalogCategoryPath } from '../categorySlug'
 import { rootCategories } from '../categoryTree'
 
 export function HomePage() {
   const { content, brands, categories, machines, loading } = useSite()
+  const location = useLocation()
   const home = content.home || {}
   const previewMachines = machines.slice(0, 6)
 
+  useEffect(() => {
+    if (location.hash !== '#process') return
+    const frame = requestAnimationFrame(() => {
+      const node = document.getElementById('process')
+      if (!node) return
+      const top = node.getBoundingClientRect().top + window.scrollY - 108
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [location.hash, loading])
+
   return (
     <div className="page">
+      <HomeIntro ready={!loading} />
       <Header variant="home" />
 
       <main id="top">
         <section className="hero">
           <div className="hero-copy">
             <p className="brand">
-              Buy<span>Tech</span>
+              <Logo />
             </p>
             <h1>{home.heroTitle || 'Новая спецтехника из Китая — в Казахстан'}</h1>
             <p className="hero-lead">
@@ -46,8 +62,10 @@ export function HomePage() {
           <div className="brands-inner">
             <p>{home.brandsLabel || 'Работаем с заводами Китая'}</p>
             <ul>
-              {brands.map((brand) => (
-                <li key={brand.id}>{brand.name}</li>
+              {loading ? <BrandSkeletons /> : brands.map((brand) => (
+                <li key={brand.id}>
+                  <Link to={brandPath(brand, brands)}>{brand.name}</Link>
+                </li>
               ))}
             </ul>
           </div>
@@ -58,20 +76,23 @@ export function HomePage() {
             <h2>{home.categoriesTitle || 'Категории техники'}</h2>
             <p>{home.categoriesLead}</p>
           </div>
-          <div className="category-grid">
-            {rootCategories(categories).map((category) => (
-              <Link
-                key={category.id}
-                className="category"
-                to={catalogCategoryPath(category, categories)}
-              >
-                <img src={category.image} alt={category.title} />
+          <div className="category-grid" aria-busy={loading || undefined}>
+            {loading ? (
+              <CategoryGridSkeleton />
+            ) : (
+              rootCategories(categories).map((category) => (
+                <Link
+                  key={category.id}
+                  className="category"
+                  to={catalogCategoryPath(category, categories)}
+                >
+                <img src={category.image} alt="" />
                 <div className="category-meta">
                   <h3>{category.title}</h3>
-                  <span>{category.hint}</span>
                 </div>
-              </Link>
-            ))}
+                </Link>
+              ))
+            )}
           </div>
         </section>
 
@@ -81,7 +102,10 @@ export function HomePage() {
             <p>{home.catalogLead}</p>
           </div>
           {loading ? (
-            <p>Загрузка…</p>
+            <>
+              <p className="skeleton-status">Загрузка техники</p>
+              <MachineGridSkeleton count={6} />
+            </>
           ) : (
             <div className="machine-grid">
               {previewMachines.map((machine) => (

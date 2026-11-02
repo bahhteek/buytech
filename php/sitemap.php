@@ -39,9 +39,22 @@ function sitemap_urls()
         );
     }
 
+    $brands = isset($db['brands']) && is_array($db['brands']) ? $db['brands'] : array();
+    $brandSlugs = brand_slug_map($brands);
+    foreach ($brands as $brand) {
+        if (empty($brand['id']) || empty($brand['name']) || empty($brandSlugs[$brand['id']])) {
+            continue;
+        }
+        $urls[] = array(
+            'loc' => $base . '/brand/' . $brandSlugs[$brand['id']],
+            'changefreq' => 'weekly',
+            'priority' => '0.7',
+        );
+    }
+
     $machines = isset($db['machines']) && is_array($db['machines']) ? $db['machines'] : array();
     foreach ($machines as $machine) {
-        if (empty($machine['id'])) {
+        if (empty($machine['id']) || !machine_is_public($machine)) {
             continue;
         }
         $urls[] = array(
